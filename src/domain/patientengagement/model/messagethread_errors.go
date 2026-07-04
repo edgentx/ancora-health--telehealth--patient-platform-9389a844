@@ -14,6 +14,15 @@ var (
 	// ErrMissingSubject is returned when StartMessageThreadCmd omits the subject.
 	ErrMissingSubject = errors.New("messagethread: subject is required")
 
+	// ErrMissingThread is returned when PostSecureMessageCmd omits the thread id.
+	ErrMissingThread = errors.New("messagethread: thread id is required")
+
+	// ErrMissingAuthor is returned when PostSecureMessageCmd omits the author id.
+	ErrMissingAuthor = errors.New("messagethread: author id is required")
+
+	// ErrMissingBody is returned when PostSecureMessageCmd omits the message body.
+	ErrMissingBody = errors.New("messagethread: message body is required")
+
 	// ErrParticipantAccessNotRestricted is returned when the thread's access is
 	// not confined to its participant set. Invariant: only the patient and
 	// care-team participants may post to or read the thread.
