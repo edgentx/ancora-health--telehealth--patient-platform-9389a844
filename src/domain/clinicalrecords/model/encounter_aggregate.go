@@ -76,6 +76,8 @@ func (a *EncounterAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, err
 		return a.openEncounter(c)
 	case SignSoapNoteCmd:
 		return a.signSoapNote(c)
+	case CompleteEncounterCmd:
+		return a.completeEncounter(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -233,6 +235,70 @@ func (a *EncounterAggregate) signSoapNote(cmd SignSoapNoteCmd) ([]shared.DomainE
 func (a *EncounterAggregate) applySoapNoteSigned(evt SoapNoteSignedEvent) {
 	a.Note = &ClinicalNote{Content: evt.SoapNote, Signed: true}
 	a.Diagnoses = evt.Diagnoses
+}
+
+// completeEncounter handles CompleteEncounterCmd: it validates the command
+// input, enforces the encounter invariants, then emits an
+// EncounterCompletedEvent and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the encounter id must be present.
+//   - Participant scope: only the provider the encounter is scoped to may close
+//     it.
+//   - Note immutability: an already-completed encounter is sealed and may not be
+//     re-completed; a correction must be an appended addendum, not a re-close.
+//   - Coded diagnoses: every recorded diagnosis must reference a coded
+//     terminology entry.
+//   - Completion integrity: the encounter cannot be marked complete without a
+//     signed note.
+func (a *EncounterAggregate) completeEncounter(cmd CompleteEncounterCmd) ([]shared.DomainEvent, error) {
+	if cmd.EncounterId == "" {
+		return nil, ErrMissingEncounter
+	}
+
+	// Invariant: only participants scoped to the encounter may act on it. When
+	// the encounter is bound to a provider, only that provider may close it.
+	if a.ScopedProviderID != "" && a.ScopedProviderID != cmd.ProviderId {
+		return nil, ErrParticipantNotScoped
+	}
+
+	// Invariant: a signed SOAP note is immutable. A completed encounter is
+	// already sealed around its signed note, so re-completing it is rejected —
+	// corrections belong in appended addenda.
+	if a.Status == EncounterStatusCompleted {
+		return nil, ErrSignedNoteImmutable
+	}
+
+	// Invariant: every diagnosis must reference a coded terminology entry.
+	for _, d := range a.Diagnoses {
+		if d.Code == "" {
+			return nil, ErrDiagnosisUncoded
+		}
+	}
+
+	// Invariant: an encounter cannot be marked complete without a signed note.
+	if a.Note == nil || !a.Note.Signed {
+		return nil, ErrIncompleteWithoutSignedNote
+	}
+
+	evt := EncounterCompletedEvent{
+		EncounterID: a.ID,
+		ProviderID:  cmd.ProviderId,
+	}
+
+	a.applyEncounterCompleted(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyEncounterCompleted mutates aggregate state from an EncounterCompletedEvent.
+// Like apply it is the single place these state changes happen, so it serves
+// both command handling and future event replay.
+func (a *EncounterAggregate) applyEncounterCompleted(evt EncounterCompletedEvent) {
+	a.Status = EncounterStatusCompleted
 }
 
 // provisionVideoRoomID derives the deterministic identifier of the video room
