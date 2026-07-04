@@ -36,6 +36,9 @@ var (
 	// ErrMissingTenant is returned when RegisterUserCmd omits the tenant id.
 	ErrMissingTenant = errors.New("user account: tenant id is required")
 
+	// ErrMissingMfaCode is returned when AuthenticateUserCmd omits the MFA code.
+	ErrMissingMfaCode = errors.New("user account: mfa code is required")
+
 	// ErrMissingAccountID is returned when LockAccountCmd omits the account id.
 	ErrMissingAccountID = errors.New("user account: account id is required")
 
