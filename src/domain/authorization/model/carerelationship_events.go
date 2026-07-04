@@ -31,3 +31,28 @@ func (e CareRelationshipEstablishedEvent) AggregateID() string { return e.Relati
 // Compile-time assertion that CareRelationshipEstablishedEvent satisfies the
 // DomainEvent contract.
 var _ shared.DomainEvent = CareRelationshipEstablishedEvent{}
+
+// CareRelationshipRevokedEventType is the stable wire name emitted when a
+// care-team-to-patient grant is revoked.
+const CareRelationshipRevokedEventType = "care.relationship.revoked"
+
+// CareRelationshipRevokedEvent is emitted when a RevokeCareRelationshipCmd
+// succeeds. It records the relationship whose grant was revoked and the reason
+// the care relationship was ended.
+type CareRelationshipRevokedEvent struct {
+	// RelationshipID is the identity of the CareRelationshipAggregate that
+	// produced the event.
+	RelationshipID string
+	// Reason records why the care relationship was ended.
+	Reason string
+}
+
+// Type identifies the event kind.
+func (e CareRelationshipRevokedEvent) Type() string { return CareRelationshipRevokedEventType }
+
+// AggregateID ties the event back to the care relationship that produced it.
+func (e CareRelationshipRevokedEvent) AggregateID() string { return e.RelationshipID }
+
+// Compile-time assertion that CareRelationshipRevokedEvent satisfies the
+// DomainEvent contract.
+var _ shared.DomainEvent = CareRelationshipRevokedEvent{}
