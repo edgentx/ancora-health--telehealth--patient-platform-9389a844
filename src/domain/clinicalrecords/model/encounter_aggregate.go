@@ -74,6 +74,8 @@ func (a *EncounterAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, err
 	switch c := cmd.(type) {
 	case OpenEncounterCmd:
 		return a.openEncounter(c)
+	case SignSoapNoteCmd:
+		return a.signSoapNote(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -155,6 +157,82 @@ func (a *EncounterAggregate) apply(evt EncounterOpenedEvent) {
 	a.ScopedProviderID = evt.ProviderID
 	a.ScopedPatientID = evt.PatientID
 	a.VideoRoomID = evt.VideoRoomID
+}
+
+// signSoapNote handles SignSoapNoteCmd: it validates the command input, enforces
+// the encounter invariants, then emits a SoapNoteSignedEvent and buffers it on
+// the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: encounter id, note body and at least one diagnosis must all
+//     be present.
+//   - Participant scope: only the provider the encounter is scoped to may sign
+//     the in-call note.
+//   - Note immutability: an already-signed note may not be re-signed; a
+//     correction must be an appended addendum, not a fresh signature.
+//   - Coded diagnoses: every diagnosis being recorded must reference a coded
+//     terminology entry.
+//   - Completion integrity: the aggregate must not already be a completed
+//     encounter that is somehow missing its signed note.
+func (a *EncounterAggregate) signSoapNote(cmd SignSoapNoteCmd) ([]shared.DomainEvent, error) {
+	if cmd.EncounterId == "" {
+		return nil, ErrMissingEncounter
+	}
+	if cmd.SoapNote == "" {
+		return nil, ErrMissingSoapNote
+	}
+	if len(cmd.Diagnoses) == 0 {
+		return nil, ErrMissingDiagnoses
+	}
+
+	// Invariant: only participants scoped to the encounter may view or act on
+	// the in-call note. When the encounter is bound to a provider, only that
+	// provider may sign its note.
+	if a.ScopedProviderID != "" && a.ScopedProviderID != cmd.ProviderId {
+		return nil, ErrParticipantNotScoped
+	}
+
+	// Invariant: a signed SOAP note is immutable. Re-signing an already-signed
+	// note would let it be edited under a new signature, so it is rejected —
+	// corrections belong in appended addenda.
+	if a.Note != nil && a.Note.Signed {
+		return nil, ErrSignedNoteImmutable
+	}
+
+	// Invariant: every diagnosis must reference a coded terminology entry.
+	for _, d := range cmd.Diagnoses {
+		if d.Code == "" {
+			return nil, ErrDiagnosisUncoded
+		}
+	}
+
+	// Invariant: an encounter cannot be complete without a signed note. Guard
+	// against acting on an aggregate that is already completed yet inconsistent.
+	if a.Status == EncounterStatusCompleted && (a.Note == nil || !a.Note.Signed) {
+		return nil, ErrIncompleteWithoutSignedNote
+	}
+
+	evt := SoapNoteSignedEvent{
+		EncounterID: a.ID,
+		ProviderID:  cmd.ProviderId,
+		SoapNote:    cmd.SoapNote,
+		Diagnoses:   cmd.Diagnoses,
+	}
+
+	a.applySoapNoteSigned(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applySoapNoteSigned mutates aggregate state from a SoapNoteSignedEvent. Like
+// apply it is the single place these state changes happen, so it serves both
+// command handling and future event replay.
+func (a *EncounterAggregate) applySoapNoteSigned(evt SoapNoteSignedEvent) {
+	a.Note = &ClinicalNote{Content: evt.SoapNote, Signed: true}
+	a.Diagnoses = evt.Diagnoses
 }
 
 // provisionVideoRoomID derives the deterministic identifier of the video room

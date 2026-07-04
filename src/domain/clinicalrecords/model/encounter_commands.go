@@ -16,3 +16,25 @@ type OpenEncounterCmd struct {
 	// PatientId identifies the patient joining the encounter.
 	PatientId string
 }
+
+// SignSoapNoteCmd requests that the encounter's SOAP note be signed and sealed
+// by the rendering provider, recording the coded diagnoses reached during the
+// encounter.
+//
+// Signing is the act that makes the note authoritative: once signed the note is
+// immutable and may only be corrected by appended addenda. ProviderId names the
+// signing provider, who must be the participant the encounter is scoped to —
+// only scoped participants may view or act on the in-call note. Every diagnosis
+// must reference a coded terminology entry (e.g., an ICD-10 code).
+type SignSoapNoteCmd struct {
+	// EncounterId is the identity of the encounter whose note is being signed.
+	EncounterId string
+	// ProviderId identifies the provider signing the note; it must match the
+	// provider the encounter is scoped to.
+	ProviderId string
+	// SoapNote is the body of the SOAP note being signed and sealed.
+	SoapNote string
+	// Diagnoses are the coded findings recorded on the encounter. Each must
+	// carry a coded-terminology reference.
+	Diagnoses []Diagnosis
+}
