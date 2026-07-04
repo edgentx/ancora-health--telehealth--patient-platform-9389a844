@@ -47,6 +47,8 @@ func (a *SessionAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, error
 	switch c := cmd.(type) {
 	case IssueSessionCmd:
 		return a.issueSession(c)
+	case RevokeSessionCmd:
+		return a.revokeSession(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -112,6 +114,57 @@ func (a *SessionAggregate) apply(evt SessionIssuedEvent) {
 	a.Role = evt.Role
 	a.DeviceFingerprint = evt.DeviceFingerprint
 	a.ExpiresAt = evt.ExpiresAt
+}
+
+// revokeSession handles RevokeSessionCmd: it validates the command input, enforces
+// the session invariants, then emits a SessionRevokedEvent and buffers it on the
+// aggregate. The invariant guards mirror issueSession so the strongest prohibitions
+// (an unauthenticated account or an already-revoked session) are reported before
+// the lifetime check.
+func (a *SessionAggregate) revokeSession(cmd RevokeSessionCmd) ([]shared.DomainEvent, error) {
+	if strings.TrimSpace(cmd.SessionId) == "" {
+		return nil, ErrMissingSessionID
+	}
+	if strings.TrimSpace(cmd.Reason) == "" {
+		return nil, ErrMissingRevocationReason
+	}
+
+	// Invariant: a session may only be issued to a successfully authenticated
+	// account.
+	if !a.Authenticated {
+		return nil, ErrAccountNotAuthenticated
+	}
+	// Invariant: a revoked session must be rejected immediately on the next
+	// request, so a session already revoked cannot be revoked again.
+	if a.Revoked {
+		return nil, ErrSessionRevoked
+	}
+	// Invariant: session expiry must not exceed the configured per-role maximum
+	// lifetime. A session whose remaining life is longer than its role permits has
+	// an invalid expiry and cannot be operated on.
+	if !a.ExpiresAt.IsZero() && time.Until(a.ExpiresAt) > maxLifetimeForRole(a.Role) {
+		return nil, ErrExpiryExceedsMaxLifetime
+	}
+
+	evt := SessionRevokedEvent{
+		SessionID: a.ID,
+		Reason:    cmd.Reason,
+		RevokedAt: time.Now(),
+	}
+
+	a.applyRevoked(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyRevoked mutates aggregate state from a SessionRevokedEvent, marking the
+// session revoked so the next request is rejected. Keeping mutation here lets the
+// same event drive both command handling and future replay when rehydrating from
+// the store.
+func (a *SessionAggregate) applyRevoked(evt SessionRevokedEvent) {
+	a.Revoked = true
 }
 
 // maxLifetimeForRole resolves the maximum session lifetime allowed for an

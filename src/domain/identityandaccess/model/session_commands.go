@@ -19,3 +19,15 @@ type IssueSessionCmd struct {
 	// It must not exceed the configured per-role maximum lifetime.
 	RequestedLifetime time.Duration
 }
+
+// RevokeSessionCmd requests that an active session be invalidated immediately, so
+// that the next request carrying it is rejected. It carries the identity of the
+// session to revoke and the reason the revocation was triggered (e.g. logout,
+// suspected compromise, administrative action).
+type RevokeSessionCmd struct {
+	// SessionId identifies the session to revoke. It must match the aggregate the
+	// command is dispatched to.
+	SessionId string
+	// Reason records why the session is being revoked, for the audit trail.
+	Reason string
+}
