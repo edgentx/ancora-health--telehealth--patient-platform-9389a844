@@ -32,4 +32,11 @@ var (
 	// ErrMissingSessionLifetime is returned when IssueSessionCmd omits a positive
 	// requested lifetime.
 	ErrMissingSessionLifetime = errors.New("session: a positive requested lifetime is required")
+
+	// ErrMissingSessionID is returned when RevokeSessionCmd omits the session id.
+	ErrMissingSessionID = errors.New("session: session id is required")
+
+	// ErrMissingRevocationReason is returned when RevokeSessionCmd omits the
+	// revocation reason.
+	ErrMissingRevocationReason = errors.New("session: revocation reason is required")
 )
