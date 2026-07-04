@@ -34,4 +34,16 @@ var (
 	// further payment. Invariant: a voided invoice cannot receive further
 	// payments.
 	ErrVoidedInvoicePayment = errors.New("invoice: a voided invoice cannot receive further payments")
+
+	// ErrMissingInvoiceID is returned when ApplyInsuranceAdjustmentCmd omits the
+	// invoice id.
+	ErrMissingInvoiceID = errors.New("invoice: invoice id is required")
+
+	// ErrUnverifiedEligibility is returned when ApplyInsuranceAdjustmentCmd is
+	// given an eligibility result that has not been verified.
+	ErrUnverifiedEligibility = errors.New("invoice: eligibility result must be verified")
+
+	// ErrNegativeAdjustment is returned when ApplyInsuranceAdjustmentCmd is given
+	// a negative coverage or copay amount.
+	ErrNegativeAdjustment = errors.New("invoice: coverage and copay may not be negative")
 )
