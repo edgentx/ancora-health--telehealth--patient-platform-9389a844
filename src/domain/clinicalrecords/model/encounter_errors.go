@@ -13,6 +13,15 @@ var (
 	// ErrMissingPatient is returned when OpenEncounterCmd omits the patient id.
 	ErrMissingPatient = errors.New("encounter: patient id is required")
 
+	// ErrMissingEncounter is returned when SignSoapNoteCmd omits the encounter id.
+	ErrMissingEncounter = errors.New("encounter: encounter id is required")
+
+	// ErrMissingSoapNote is returned when SignSoapNoteCmd omits the SOAP note body.
+	ErrMissingSoapNote = errors.New("encounter: soap note is required")
+
+	// ErrMissingDiagnoses is returned when SignSoapNoteCmd carries no diagnoses.
+	ErrMissingDiagnoses = errors.New("encounter: at least one diagnosis is required")
+
 	// ErrParticipantNotScoped is returned when the command's provider or patient
 	// is not one of the participants the encounter is scoped to. Invariant: only
 	// participants scoped to the encounter may join the video room or view

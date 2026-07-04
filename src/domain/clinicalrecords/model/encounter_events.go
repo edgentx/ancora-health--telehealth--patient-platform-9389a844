@@ -32,3 +32,33 @@ func (e EncounterOpenedEvent) AggregateID() string { return e.EncounterID }
 // Compile-time assertion that EncounterOpenedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = EncounterOpenedEvent{}
+
+// SoapNoteSignedEventType is the stable wire name emitted when an encounter's
+// SOAP note is signed and sealed.
+const SoapNoteSignedEventType = "encounter.note.signed"
+
+// SoapNoteSignedEvent is emitted when a SignSoapNoteCmd succeeds. It records the
+// provider who signed the note, the sealed note body, and the coded diagnoses
+// captured for the encounter.
+type SoapNoteSignedEvent struct {
+	// EncounterID is the identity of the EncounterAggregate that produced the
+	// event.
+	EncounterID string
+	// ProviderID is the provider who signed the note; it is the participant the
+	// encounter is scoped to.
+	ProviderID string
+	// SoapNote is the sealed body of the SOAP note.
+	SoapNote string
+	// Diagnoses are the coded findings recorded on the encounter.
+	Diagnoses []Diagnosis
+}
+
+// Type identifies the event kind.
+func (e SoapNoteSignedEvent) Type() string { return SoapNoteSignedEventType }
+
+// AggregateID ties the event back to the encounter that produced it.
+func (e SoapNoteSignedEvent) AggregateID() string { return e.EncounterID }
+
+// Compile-time assertion that SoapNoteSignedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = SoapNoteSignedEvent{}
