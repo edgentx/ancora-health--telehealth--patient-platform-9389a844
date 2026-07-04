@@ -15,6 +15,9 @@ const (
 	// InvoiceStatusGenerated is an invoice that has been generated from a
 	// completed encounter and is now billable.
 	InvoiceStatusGenerated InvoiceStatus = "generated"
+	// InvoiceStatusVoided is an invoice that has been voided and can no longer be
+	// paid.
+	InvoiceStatusVoided InvoiceStatus = "voided"
 )
 
 // InvoiceAggregate is the billing-and-insurance aggregate that tracks an invoice
@@ -77,6 +80,8 @@ func (a *InvoiceAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, error
 	switch c := cmd.(type) {
 	case GenerateInvoiceCmd:
 		return a.generateInvoice(c)
+	case VoidInvoiceCmd:
+		return a.voidInvoice(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -151,4 +156,68 @@ func (a *InvoiceAggregate) apply(evt InvoiceGeneratedEvent) {
 	a.EncounterID = evt.EncounterID
 	a.LineItems = evt.LineItems
 	a.PolicyID = evt.PolicyID
+}
+
+// voidInvoice handles VoidInvoiceCmd: it validates the command input, enforces
+// the invoice invariants, then emits an InvoiceVoidedEvent and buffers it on
+// the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the invoice id and a void reason must both be present.
+//   - Completed encounter: an invoice may only be generated from a completed
+//     encounter.
+//   - Patient responsibility: it must equal charges minus the verified insurance
+//     adjustment and copay.
+//   - Outstanding balance: an invoice cannot be marked paid for more than its
+//     outstanding balance.
+//   - Voided invoice: a voided invoice cannot receive further payments.
+func (a *InvoiceAggregate) voidInvoice(cmd VoidInvoiceCmd) ([]shared.DomainEvent, error) {
+	if cmd.InvoiceId == "" {
+		return nil, ErrMissingInvoiceID
+	}
+	if cmd.Reason == "" {
+		return nil, ErrMissingVoidReason
+	}
+
+	// Invariant: an invoice may only be generated from a completed encounter.
+	if a.EncounterNotCompleted {
+		return nil, ErrEncounterNotCompleted
+	}
+
+	// Invariant: patient responsibility must equal charges minus verified
+	// insurance adjustment and copay.
+	if a.PatientResponsibilityMismatch {
+		return nil, ErrPatientResponsibilityMismatch
+	}
+
+	// Invariant: an invoice cannot be marked paid for more than its outstanding
+	// balance.
+	if a.PaymentExceedsOutstanding {
+		return nil, ErrPaymentExceedsOutstanding
+	}
+
+	// Invariant: a voided invoice cannot receive further payments.
+	if a.Voided {
+		return nil, ErrVoidedInvoicePayment
+	}
+
+	evt := InvoiceVoidedEvent{
+		InvoiceID: a.ID,
+		Reason:    cmd.Reason,
+	}
+
+	a.applyVoided(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyVoided mutates aggregate state from an InvoiceVoidedEvent. Like apply it
+// is the single place voided-state changes, so it serves both command handling
+// and future event replay when rehydrating the aggregate from the store.
+func (a *InvoiceAggregate) applyVoided(evt InvoiceVoidedEvent) {
+	a.Status = InvoiceStatusVoided
+	a.Voided = true
 }

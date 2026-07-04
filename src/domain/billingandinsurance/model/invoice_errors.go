@@ -14,6 +14,12 @@ var (
 	// ErrMissingPolicy is returned when GenerateInvoiceCmd omits the policy id.
 	ErrMissingPolicy = errors.New("invoice: policy id is required")
 
+	// ErrMissingInvoiceID is returned when VoidInvoiceCmd omits the invoice id.
+	ErrMissingInvoiceID = errors.New("invoice: invoice id is required")
+
+	// ErrMissingVoidReason is returned when VoidInvoiceCmd omits the void reason.
+	ErrMissingVoidReason = errors.New("invoice: void reason is required")
+
 	// ErrEncounterNotCompleted is returned when the invoice is generated from an
 	// encounter that is not completed. Invariant: an invoice may only be
 	// generated from a completed encounter.

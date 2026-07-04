@@ -33,3 +33,19 @@ type GenerateInvoiceCmd struct {
 	// against.
 	PolicyId string
 }
+
+// VoidInvoiceCmd requests that an issued Invoice be voided, cancelling it so it
+// can no longer be paid.
+//
+// Voiding is the act that retires a billable invoice: it still enforces the
+// invoice invariants — the source encounter must be completed, patient
+// responsibility must reconcile against charges, the invoice must not have been
+// marked paid beyond its outstanding balance, and an already-voided invoice
+// cannot be acted on further. InvoiceId identifies the invoice being voided and
+// Reason records why. Both are mandatory.
+type VoidInvoiceCmd struct {
+	// InvoiceId identifies the invoice being voided.
+	InvoiceId string
+	// Reason records why the invoice is being voided.
+	Reason string
+}
