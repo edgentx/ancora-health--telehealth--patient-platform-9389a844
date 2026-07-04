@@ -17,6 +17,9 @@ const (
 	// PaymentStatusInitiated is a payment whose tokenized charge has been started
 	// against an invoice and is awaiting gateway confirmation.
 	PaymentStatusInitiated PaymentStatus = "initiated"
+	// PaymentStatusReconciled is a payment whose outcome has been confirmed by an
+	// HMAC-verified gateway webhook via ReconcilePaymentCmd.
+	PaymentStatusReconciled PaymentStatus = "reconciled"
 )
 
 // PaymentAggregate is the aggregate root for a billing-and-insurance payment.
@@ -73,6 +76,8 @@ func (a *PaymentAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, error
 	switch c := cmd.(type) {
 	case InitiatePaymentCmd:
 		return a.initiatePayment(c)
+	case ReconcilePaymentCmd:
+		return a.reconcilePayment(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -135,6 +140,61 @@ func (a *PaymentAggregate) initiatePayment(cmd InitiatePaymentCmd) ([]shared.Dom
 	return []shared.DomainEvent{evt}, nil
 }
 
+// reconcilePayment handles ReconcilePaymentCmd: it validates the command input,
+// enforces the payment invariants, then emits a PaymentReconciledEvent and
+// buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the payment id, gateway webhook payload and its signature
+//     must all be present.
+//   - Tokenization: raw card data is never persisted — only gateway tokens are
+//     stored.
+//   - Outstanding balance: a payment can only be captured against an outstanding
+//     invoice balance.
+//   - Verified webhook: payment status may only advance on an HMAC-verified
+//     webhook from the gateway.
+func (a *PaymentAggregate) reconcilePayment(cmd ReconcilePaymentCmd) ([]shared.DomainEvent, error) {
+	if cmd.PaymentId == "" {
+		return nil, ErrMissingPayment
+	}
+	if cmd.WebhookPayload == "" {
+		return nil, ErrMissingWebhookPayload
+	}
+	if cmd.Signature == "" {
+		return nil, ErrMissingSignature
+	}
+
+	// Invariant: raw card data is never persisted — only gateway tokens are
+	// stored.
+	if a.RawCardDataPresent {
+		return nil, ErrRawCardData
+	}
+
+	// Invariant: a payment can only be captured against an outstanding invoice
+	// balance.
+	if a.NoOutstandingBalance {
+		return nil, ErrNoOutstandingBalance
+	}
+
+	// Invariant: payment status may only advance on an HMAC-verified webhook from
+	// the gateway.
+	if a.WebhookNotVerified {
+		return nil, ErrWebhookNotVerified
+	}
+
+	evt := PaymentReconciledEvent{
+		PaymentID: a.ID,
+		Signature: cmd.Signature,
+	}
+
+	a.applyReconciled(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -143,4 +203,11 @@ func (a *PaymentAggregate) apply(evt PaymentInitiatedEvent) {
 	a.InvoiceID = evt.InvoiceID
 	a.PaymentToken = evt.PaymentToken
 	a.AmountCents = evt.AmountCents
+}
+
+// applyReconciled mutates aggregate state from a PaymentReconciledEvent. Like
+// apply, it is the single mutation point for reconciliation, reused for both
+// command handling and event replay.
+func (a *PaymentAggregate) applyReconciled(evt PaymentReconciledEvent) {
+	a.Status = PaymentStatusReconciled
 }

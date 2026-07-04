@@ -30,3 +30,28 @@ func (e PaymentInitiatedEvent) AggregateID() string { return e.PaymentID }
 // Compile-time assertion that PaymentInitiatedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = PaymentInitiatedEvent{}
+
+// PaymentReconciledEventType is the stable wire name emitted when a payment is
+// reconciled from a verified gateway webhook.
+const PaymentReconciledEventType = "payment.reconciled"
+
+// PaymentReconciledEvent is emitted when a ReconcilePaymentCmd succeeds. It
+// records the payment that was reconciled and the HMAC signature of the gateway
+// webhook that authorized the status advance, preserving the audit trail from
+// verified webhook to reconciled state. Raw card data is never recorded.
+type PaymentReconciledEvent struct {
+	// PaymentID is the identity of the PaymentAggregate that produced the event.
+	PaymentID string
+	// Signature is the HMAC of the gateway webhook that authorized reconciliation.
+	Signature string
+}
+
+// Type identifies the event kind.
+func (e PaymentReconciledEvent) Type() string { return PaymentReconciledEventType }
+
+// AggregateID ties the event back to the payment that produced it.
+func (e PaymentReconciledEvent) AggregateID() string { return e.PaymentID }
+
+// Compile-time assertion that PaymentReconciledEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = PaymentReconciledEvent{}

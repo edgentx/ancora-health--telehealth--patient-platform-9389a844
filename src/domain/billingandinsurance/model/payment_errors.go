@@ -28,4 +28,15 @@ var (
 	// without an HMAC-verified webhook from the gateway. Invariant: payment status
 	// may only advance on an HMAC-verified webhook from the gateway.
 	ErrWebhookNotVerified = errors.New("payment: payment status may only advance on an HMAC-verified webhook from the gateway")
+
+	// ErrMissingPayment is returned when ReconcilePaymentCmd omits the payment id.
+	ErrMissingPayment = errors.New("payment: payment id is required")
+
+	// ErrMissingWebhookPayload is returned when ReconcilePaymentCmd omits the
+	// gateway webhook payload.
+	ErrMissingWebhookPayload = errors.New("payment: webhook payload is required")
+
+	// ErrMissingSignature is returned when ReconcilePaymentCmd omits the gateway
+	// webhook HMAC signature.
+	ErrMissingSignature = errors.New("payment: webhook signature is required")
 )
