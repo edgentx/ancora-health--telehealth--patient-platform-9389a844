@@ -14,3 +14,15 @@ type RegisterUserCmd struct {
 	// TenantId scopes the account, and its email uniqueness, to a single tenant.
 	TenantId string
 }
+
+// LockAccountCmd requests that a UserAccount be locked, typically after its
+// failed-attempt threshold is crossed by credential-stuffing protection. It
+// carries the identity of the account to lock and the reason the lock is being
+// applied, which is recorded on the emitted event for audit.
+type LockAccountCmd struct {
+	// AccountId identifies the UserAccount to lock.
+	AccountId string
+	// Reason records why the account is being locked (e.g. "failed-attempt
+	// threshold exceeded").
+	Reason string
+}
