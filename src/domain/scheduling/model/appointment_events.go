@@ -124,3 +124,31 @@ func (e AppointmentBookedEvent) AggregateID() string { return e.AppointmentID }
 // Compile-time assertion that AppointmentBookedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = AppointmentBookedEvent{}
+
+// AppointmentCancelledEventType is the stable wire name emitted when an
+// appointment is cancelled within policy.
+const AppointmentCancelledEventType = "appointment.cancelled"
+
+// AppointmentCancelledEvent is emitted when a CancelAppointmentCmd succeeds. It
+// records the appointment that was cancelled and the reason for the
+// cancellation, which drives the policy penalty applied. Its emission releases
+// the slot the appointment held and takes the appointment to a terminal
+// cancelled state.
+type AppointmentCancelledEvent struct {
+	// AppointmentID is the identity of the AppointmentAggregate that produced the
+	// event.
+	AppointmentID string
+	// Reason records why the appointment was cancelled and drives the policy
+	// penalty applied on cancellation.
+	Reason string
+}
+
+// Type identifies the event kind.
+func (e AppointmentCancelledEvent) Type() string { return AppointmentCancelledEventType }
+
+// AggregateID ties the event back to the appointment that produced it.
+func (e AppointmentCancelledEvent) AggregateID() string { return e.AppointmentID }
+
+// Compile-time assertion that AppointmentCancelledEvent satisfies the
+// DomainEvent contract.
+var _ shared.DomainEvent = AppointmentCancelledEvent{}
