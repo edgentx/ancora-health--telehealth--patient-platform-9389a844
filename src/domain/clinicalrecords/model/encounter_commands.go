@@ -38,3 +38,20 @@ type SignSoapNoteCmd struct {
 	// carry a coded-terminology reference.
 	Diagnoses []Diagnosis
 }
+
+// CompleteEncounterCmd requests that a documented encounter be closed, marking
+// it complete once its SOAP note has been signed.
+//
+// Completion is the act that finalizes the encounter: it may only proceed when
+// the encounter carries a signed note, an encounter cannot be marked complete
+// without one. ProviderId names the completing provider, who must be the
+// participant the encounter is scoped to — only scoped participants may act on
+// the encounter — and every recorded diagnosis must reference a coded
+// terminology entry (e.g., an ICD-10 code).
+type CompleteEncounterCmd struct {
+	// EncounterId is the identity of the encounter being closed.
+	EncounterId string
+	// ProviderId identifies the provider completing the encounter; it must match
+	// the provider the encounter is scoped to.
+	ProviderId string
+}

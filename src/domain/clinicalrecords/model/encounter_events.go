@@ -62,3 +62,29 @@ func (e SoapNoteSignedEvent) AggregateID() string { return e.EncounterID }
 // Compile-time assertion that SoapNoteSignedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = SoapNoteSignedEvent{}
+
+// EncounterCompletedEventType is the stable wire name emitted when a documented
+// encounter is closed and marked complete.
+const EncounterCompletedEventType = "encounter.completed"
+
+// EncounterCompletedEvent is emitted when a CompleteEncounterCmd succeeds. It
+// records the provider who closed the encounter; a completed encounter always
+// carries a signed note.
+type EncounterCompletedEvent struct {
+	// EncounterID is the identity of the EncounterAggregate that produced the
+	// event.
+	EncounterID string
+	// ProviderID is the provider who completed the encounter; it is the
+	// participant the encounter is scoped to.
+	ProviderID string
+}
+
+// Type identifies the event kind.
+func (e EncounterCompletedEvent) Type() string { return EncounterCompletedEventType }
+
+// AggregateID ties the event back to the encounter that produced it.
+func (e EncounterCompletedEvent) AggregateID() string { return e.EncounterID }
+
+// Compile-time assertion that EncounterCompletedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = EncounterCompletedEvent{}
