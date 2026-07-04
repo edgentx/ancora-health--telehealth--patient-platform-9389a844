@@ -56,6 +56,8 @@ func (a *LabOrderAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, erro
 	switch c := cmd.(type) {
 	case PlaceLabOrderCmd:
 		return a.placeLabOrder(c)
+	case AttachLabResultCmd:
+		return a.attachLabResult(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -135,4 +137,69 @@ func (a *LabOrderAggregate) apply(evt LabOrderPlacedEvent) {
 	a.ScopedProviderID = evt.ProviderID
 	a.CareRelationshipActive = true
 	a.TestCode = evt.TestCode
+}
+
+// attachLabResult handles AttachLabResultCmd: it validates the command input,
+// enforces the lab-order invariants, then emits a LabResultReadyEvent and
+// buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: order id, result document reference and resulted-at must all
+//     be present.
+//   - Active care relationship: a lab order must be placed by a provider with an
+//     active care relationship to the patient, so results may only be attached
+//     while that relationship is active.
+//   - Existing, non-cancelled order: results may only be attached to an existing,
+//     non-cancelled order — an unplaced or cancelled order may not be resulted.
+//   - Result integrity: a resulted order cannot be reverted to the ordered state,
+//     so an already-resulted order will not accept another result.
+func (a *LabOrderAggregate) attachLabResult(cmd AttachLabResultCmd) ([]shared.DomainEvent, error) {
+	if cmd.OrderId == "" {
+		return nil, ErrMissingOrderId
+	}
+	if cmd.ResultDocumentRef == "" {
+		return nil, ErrMissingResultDocumentRef
+	}
+	if cmd.ResultedAt == "" {
+		return nil, ErrMissingResultedAt
+	}
+
+	// Invariant: a lab order must be placed by a provider with an active care
+	// relationship to the patient. Results may only be attached while the scoped
+	// provider's care relationship remains active.
+	if !a.CareRelationshipActive {
+		return nil, ErrProviderNotInCare
+	}
+
+	// Invariant: results may only be attached to an existing, non-cancelled order.
+	// An unplaced order does not yet exist, and a cancelled order is terminal.
+	if a.Status != LabOrderStatusOrdered && a.Status != LabOrderStatusResulted {
+		return nil, ErrOrderCancelled
+	}
+
+	// Invariant: a resulted order cannot be reverted to the ordered state.
+	// Attaching another result to an already-resulted order is rejected.
+	if a.Status == LabOrderStatusResulted {
+		return nil, ErrResultedCannotRevert
+	}
+
+	evt := LabResultReadyEvent{
+		LabOrderID:        a.ID,
+		ResultDocumentRef: cmd.ResultDocumentRef,
+		ResultedAt:        cmd.ResultedAt,
+	}
+
+	a.applyLabResultReady(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyLabResultReady mutates aggregate state from a LabResultReadyEvent. Like
+// apply it is the single place these state changes happen, so it serves both
+// command handling and future event replay when rehydrating the aggregate.
+func (a *LabOrderAggregate) applyLabResultReady(evt LabResultReadyEvent) {
+	a.Status = LabOrderStatusResulted
 }

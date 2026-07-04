@@ -12,6 +12,17 @@ var (
 	// ErrMissingTestCode is returned when PlaceLabOrderCmd omits the test code.
 	ErrMissingTestCode = errors.New("laborder: test code is required")
 
+	// ErrMissingOrderId is returned when AttachLabResultCmd omits the order id.
+	ErrMissingOrderId = errors.New("laborder: order id is required")
+
+	// ErrMissingResultDocumentRef is returned when AttachLabResultCmd omits the
+	// result document reference.
+	ErrMissingResultDocumentRef = errors.New("laborder: result document reference is required")
+
+	// ErrMissingResultedAt is returned when AttachLabResultCmd omits the resulted-at
+	// time.
+	ErrMissingResultedAt = errors.New("laborder: resulted-at time is required")
+
 	// ErrProviderNotInCare is returned when the ordering provider does not hold an
 	// active care relationship to the patient. Invariant: a lab order must be
 	// placed by a provider with an active care relationship to the patient.
