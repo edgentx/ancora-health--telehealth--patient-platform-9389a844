@@ -18,6 +18,11 @@ const (
 	// seed the chart. Once submitted it is immutable and may only be corrected by
 	// a new submission.
 	IntakeFormStatusSubmitted IntakeFormStatus = "submitted"
+	// IntakeFormStatusSeeded is an intake form whose validated data has been
+	// projected into the patient chart. Once seeded the projection is sealed, so
+	// the chart is never re-seeded from the same intake — a correction must be a
+	// new submission.
+	IntakeFormStatusSeeded IntakeFormStatus = "seeded"
 )
 
 // IntakeFormAggregate is the patient-engagement IntakeForm aggregate. It embeds
@@ -61,6 +66,8 @@ func (a *IntakeFormAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, er
 	switch c := cmd.(type) {
 	case SubmitIntakeFormCmd:
 		return a.submitIntakeForm(c)
+	case SeedChartFromIntakeCmd:
+		return a.seedChartFromIntake(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -124,4 +131,59 @@ func (a *IntakeFormAggregate) apply(evt IntakeFormSubmittedEvent) {
 	a.ScopedPatientID = evt.PatientID
 	a.History = evt.History
 	a.Demographics = evt.Demographics
+}
+
+// seedChartFromIntake handles SeedChartFromIntakeCmd: it validates the command
+// input, enforces the intake-form invariants, then emits an
+// IntakeChartSeededEvent and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness of input: the intake and the patient must both be identified
+//     on the command.
+//   - Validation: the form must be complete and validated before it can seed the
+//     chart; a form still flagged incomplete is rejected.
+//   - Immutability: submitted intake data is sealed and may only be corrected via
+//     a new submission, so a chart already seeded from the intake is never
+//     re-seeded.
+func (a *IntakeFormAggregate) seedChartFromIntake(cmd SeedChartFromIntakeCmd) ([]shared.DomainEvent, error) {
+	if strings.TrimSpace(cmd.IntakeId) == "" {
+		return nil, ErrMissingIntakeID
+	}
+	if strings.TrimSpace(cmd.PatientId) == "" {
+		return nil, ErrMissingIntakePatient
+	}
+
+	// Invariant: an intake form must be complete and validated before it can seed
+	// the chart.
+	if a.Incomplete {
+		return nil, ErrIntakeFormIncomplete
+	}
+
+	// Invariant: submitted intake data is immutable. Re-seeding a chart already
+	// seeded from this intake would re-project sealed data, so it is rejected — a
+	// correction must be a new submission that supersedes it.
+	if a.Status == IntakeFormStatusSeeded {
+		return nil, ErrIntakeFormSubmittedImmutable
+	}
+
+	evt := IntakeChartSeededEvent{
+		IntakeFormID: a.ID,
+		IntakeID:     cmd.IntakeId,
+		PatientID:    cmd.PatientId,
+	}
+
+	a.applyChartSeeded(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyChartSeeded mutates aggregate state from an IntakeChartSeededEvent. Like
+// apply, it is the single place chart-seeding state changes, so it serves both
+// command handling and future event replay when rehydrating from the store.
+func (a *IntakeFormAggregate) applyChartSeeded(evt IntakeChartSeededEvent) {
+	a.Status = IntakeFormStatusSeeded
+	a.ScopedPatientID = evt.PatientID
 }
