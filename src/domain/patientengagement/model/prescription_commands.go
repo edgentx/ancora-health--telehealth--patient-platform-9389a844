@@ -39,3 +39,20 @@ type TransmitPrescriptionCmd struct {
 	// PharmacyId identifies the pharmacy gateway the prescription is sent to.
 	PharmacyId string
 }
+
+// RunSafetyCheckCmd requests that a drafted Prescription be run through allergy
+// and interaction verification before it is transmitted.
+//
+// The safety check is a gating act: it verifies the drafted order against the
+// patient's allergies and the interaction profile of their other medications.
+// The same issuing invariants that gate composition and transmission gate the
+// check — the prescription must have been issued by an authenticated provider
+// with an active care relationship, a prior allergy/interaction failure must
+// have been acknowledged or overridden before the check may proceed, and a
+// prescription that has already been transmitted is immutable and may only be
+// superseded by a cancellation. PrescriptionId identifies the order to check and
+// is mandatory.
+type RunSafetyCheckCmd struct {
+	// PrescriptionId identifies the prescription the safety check is run against.
+	PrescriptionId string
+}
