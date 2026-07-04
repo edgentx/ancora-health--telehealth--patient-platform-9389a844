@@ -1,4 +1,3 @@
-```markdown
 # Ancora Health — Navigation Specification
 
 ---
@@ -321,4 +320,3 @@ Admin monitors KPIs, drills into detailed reports, and audits PHI access activit
 1. **Admin Dashboard** (`admin-dashboard`) — review real-time KPI tiles (utilization, no-shows, revenue)
 2. **Analytics & Reporting** (`analytics`) — drill down by date range, provider, or payer
 3. **PHI Access Audit Log** (`audit-log`) — review access events for HIPAA compliance
-```
