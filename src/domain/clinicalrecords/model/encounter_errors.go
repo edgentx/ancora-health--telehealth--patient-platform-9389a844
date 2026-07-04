@@ -22,6 +22,13 @@ var (
 	// ErrMissingDiagnoses is returned when SignSoapNoteCmd carries no diagnoses.
 	ErrMissingDiagnoses = errors.New("encounter: at least one diagnosis is required")
 
+	// ErrMissingAddendumText is returned when AppendAddendumCmd omits the
+	// addendum body.
+	ErrMissingAddendumText = errors.New("encounter: addendum text is required")
+
+	// ErrMissingAuthor is returned when AppendAddendumCmd omits the author id.
+	ErrMissingAuthor = errors.New("encounter: author id is required")
+
 	// ErrParticipantNotScoped is returned when the command's provider or patient
 	// is not one of the participants the encounter is scoped to. Invariant: only
 	// participants scoped to the encounter may join the video room or view
