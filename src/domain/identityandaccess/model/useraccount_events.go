@@ -1,6 +1,10 @@
 package model
 
-import "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/shared"
+import (
+	"time"
+
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/shared"
+)
 
 // UserAuthenticatedEventType is the stable type name emitted when a login
 // attempt succeeds and a session may be issued.
@@ -42,6 +46,13 @@ type UserLoginFailedEvent struct {
 	FailedAttempts int
 	// Reason is a short, machine-readable cause for the failure.
 	Reason string
+	// OccurredAt is when the failed attempt happened. The command handler stamps
+	// it so replay does not depend on the wall clock.
+	OccurredAt time.Time
+	// LockedUntil is the lockout deadline this failure establishes, or the zero
+	// value when the attempt did not trip credential-stuffing protection. apply
+	// copies it verbatim, keeping state a pure function of prior state + event.
+	LockedUntil time.Time
 }
 
 // Type identifies the event kind.

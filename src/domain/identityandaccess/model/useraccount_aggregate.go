@@ -119,9 +119,15 @@ func (a *UserAccountAggregate) authenticateUser(cmd AuthenticateUserCmd) ([]shar
 	}
 
 	// Invariant: MFA-enrolled accounts must present a valid second factor before
-	// a session is issued.
+	// a session is issued. A wrong second factor is still a credential-guessing
+	// attempt, so it is tallied toward the lockout exactly like a wrong password
+	// before the command is rejected with a domain error.
 	if a.MFAEnrolled && !a.secondFactorMatches(cmd.MFACode) {
-		return nil, ErrMFARequired
+		evt := a.buildLoginFailed("invalid_mfa")
+		a.apply(evt)
+		a.AddEvent(evt)
+		a.Version++
+		return []shared.DomainEvent{evt}, ErrMFARequired
 	}
 
 	evt := UserAuthenticatedEvent{
@@ -145,23 +151,36 @@ func (a *UserAccountAggregate) apply(evt shared.DomainEvent) {
 		a.FailedAttempts = 0
 		a.LockedUntil = time.Time{}
 	case UserLoginFailedEvent:
-		a.FailedAttempts++
-		// Engage the lockout window once the threshold is reached.
-		if a.FailedAttempts >= maxFailedLoginAttempts {
-			a.LockedUntil = time.Now().Add(lockoutWindow)
-		}
+		// State is copied verbatim from the event, which was stamped by the
+		// command handler. apply stays a pure function of prior state + event so
+		// replay is deterministic and never re-reads the wall clock.
+		e := evt.(UserLoginFailedEvent)
+		a.FailedAttempts = e.FailedAttempts
+		a.LockedUntil = e.LockedUntil
 	}
 }
 
-// buildLoginFailed constructs the failure event for the *upcoming* attempt,
-// reflecting the failed-attempt count as it will stand once apply increments it.
+// buildLoginFailed constructs the failure event for the *upcoming* attempt. It
+// stamps the occurrence time and, once the consecutive-failure threshold is
+// reached, the lockout deadline — so credential-stuffing protection is decided
+// here (with the clock) rather than in apply (which must stay pure).
 func (a *UserAccountAggregate) buildLoginFailed(reason string) UserLoginFailedEvent {
+	attempts := a.FailedAttempts + 1
+	now := time.Now()
+
+	lockedUntil := a.LockedUntil
+	if attempts >= maxFailedLoginAttempts {
+		lockedUntil = now.Add(lockoutWindow)
+	}
+
 	return UserLoginFailedEvent{
 		UserID:         a.ID,
 		TenantID:       a.TenantID,
 		Email:          a.Email,
-		FailedAttempts: a.FailedAttempts + 1,
+		FailedAttempts: attempts,
 		Reason:         reason,
+		OccurredAt:     now,
+		LockedUntil:    lockedUntil,
 	}
 }
 
