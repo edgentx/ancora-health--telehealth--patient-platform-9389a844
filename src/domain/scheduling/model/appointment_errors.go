@@ -23,6 +23,12 @@ var (
 	// new time slot.
 	ErrMissingNewTimeSlot = errors.New("appointment: new time slot is required")
 
+	// ErrMissingHoldToken is returned when BookAppointmentCmd omits the hold token.
+	ErrMissingHoldToken = errors.New("appointment: hold token is required")
+
+	// ErrMissingReason is returned when BookAppointmentCmd omits the booking reason.
+	ErrMissingReason = errors.New("appointment: booking reason is required")
+
 	// ErrSlotOutsideAvailability is returned when the requested slot falls outside
 	// the provider's published availability. Invariant: an appointment cannot be
 	// booked outside the provider's published availability.

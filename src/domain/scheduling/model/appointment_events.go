@@ -93,3 +93,34 @@ func (e AppointmentWalkInRegisteredEvent) AggregateID() string { return e.Appoin
 // Compile-time assertion that AppointmentWalkInRegisteredEvent satisfies the
 // DomainEvent contract.
 var _ shared.DomainEvent = AppointmentWalkInRegisteredEvent{}
+
+// AppointmentBookedEventType is the stable wire name emitted when a held slot is
+// confirmed into a booked appointment.
+const AppointmentBookedEventType = "appointment.booked"
+
+// AppointmentBookedEvent is emitted when a BookAppointmentCmd succeeds. It
+// records the hold lock that was confirmed, the patient the appointment was
+// booked for, and the reason for the booking. Its emission promotes the
+// appointment from the held state into a committed booking, consuming the hold
+// lock before it could expire or be released.
+type AppointmentBookedEvent struct {
+	// AppointmentID is the identity of the AppointmentAggregate that produced the
+	// event.
+	AppointmentID string
+	// HoldToken is the hold lock that was confirmed by the booking.
+	HoldToken string
+	// PatientID is the patient the appointment was booked for.
+	PatientID string
+	// Reason records why the appointment was booked.
+	Reason string
+}
+
+// Type identifies the event kind.
+func (e AppointmentBookedEvent) Type() string { return AppointmentBookedEventType }
+
+// AggregateID ties the event back to the appointment that produced it.
+func (e AppointmentBookedEvent) AggregateID() string { return e.AppointmentID }
+
+// Compile-time assertion that AppointmentBookedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = AppointmentBookedEvent{}

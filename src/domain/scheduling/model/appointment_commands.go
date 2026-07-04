@@ -61,3 +61,27 @@ type RegisterWalkInCmd struct {
 	// ProviderId identifies the provider the walk-in is registered with.
 	ProviderId string
 }
+
+// BookAppointmentCmd requests that a held slot be confirmed into a booked
+// appointment.
+//
+// Booking is the confirmation act that turns a short-lived hold into a
+// committed appointment: it consumes the hold lock acquired by HoldSlotCmd
+// before that lock expires. The same scheduling invariants that gate the hold
+// gate the booking — the slot must fall within the provider's published
+// availability, at most one appointment may occupy a given slot at a time (no
+// double-booking), the hold lock must still be live (a slot whose prior hold
+// lock has expired without confirmation must have been released first), and
+// reschedule/cancel activity is only permitted within the configured policy
+// window. HoldToken references the hold lock being confirmed, PatientId the
+// patient the appointment is booked for, and Reason the booking reason; all
+// three are mandatory.
+type BookAppointmentCmd struct {
+	// HoldToken references the hold lock acquired by HoldSlotCmd that is being
+	// confirmed into a booking.
+	HoldToken string
+	// PatientId identifies the patient the appointment is being booked for.
+	PatientId string
+	// Reason records why the appointment is being booked.
+	Reason string
+}
