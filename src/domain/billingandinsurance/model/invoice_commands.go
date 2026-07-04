@@ -73,3 +73,19 @@ type ApplyInsuranceAdjustmentCmd struct {
 	// Eligibility is the verified coverage and copay to apply.
 	Eligibility EligibilityResult
 }
+
+// VoidInvoiceCmd requests that an issued Invoice be voided, cancelling it so it
+// can no longer be adjusted or paid against.
+//
+// Voiding is the act that retires an invoice: it must have been generated from
+// a completed encounter, its patient responsibility must reconcile against
+// charges, it may not have been marked paid beyond its outstanding balance, and
+// an already-voided invoice cannot be voided again to receive further payments.
+// InvoiceId identifies the invoice being voided and Reason records why, for the
+// audit trail. Both are mandatory.
+type VoidInvoiceCmd struct {
+	// InvoiceId identifies the invoice being voided.
+	InvoiceId string
+	// Reason records why the invoice is being voided, for the audit trail.
+	Reason string
+}

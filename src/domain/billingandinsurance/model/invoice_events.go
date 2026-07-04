@@ -56,3 +56,26 @@ func (e InvoiceAdjustedEvent) AggregateID() string { return e.InvoiceID }
 // Compile-time assertion that InvoiceAdjustedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = InvoiceAdjustedEvent{}
+
+// InvoiceVoidedEventType is the stable wire name emitted when an issued invoice
+// is voided.
+const InvoiceVoidedEventType = "invoice.voided"
+
+// InvoiceVoidedEvent is emitted when a VoidInvoiceCmd succeeds. It records the
+// reason the invoice was voided, carried through for the audit trail.
+type InvoiceVoidedEvent struct {
+	// InvoiceID is the identity of the InvoiceAggregate that produced the event.
+	InvoiceID string
+	// Reason records why the invoice was voided.
+	Reason string
+}
+
+// Type identifies the event kind.
+func (e InvoiceVoidedEvent) Type() string { return InvoiceVoidedEventType }
+
+// AggregateID ties the event back to the invoice that produced it.
+func (e InvoiceVoidedEvent) AggregateID() string { return e.InvoiceID }
+
+// Compile-time assertion that InvoiceVoidedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = InvoiceVoidedEvent{}
