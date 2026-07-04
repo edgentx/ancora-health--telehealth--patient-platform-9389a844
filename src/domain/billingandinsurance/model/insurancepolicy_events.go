@@ -30,3 +30,28 @@ func (e PolicyRegisteredEvent) AggregateID() string { return e.PolicyID }
 // Compile-time assertion that PolicyRegisteredEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = PolicyRegisteredEvent{}
+
+// EligibilityVerifiedEventType is the stable wire name emitted when a policy's
+// payer eligibility is verified.
+const EligibilityVerifiedEventType = "eligibility.verified"
+
+// EligibilityVerifiedEvent is emitted when a VerifyEligibilityCmd succeeds. It
+// records the policy whose eligibility was verified and the service date the
+// verification covers.
+type EligibilityVerifiedEvent struct {
+	// PolicyID is the identity of the InsurancePolicyAggregate that produced the
+	// event.
+	PolicyID string
+	// ServiceDate is the date coverage was verified for.
+	ServiceDate string
+}
+
+// Type identifies the event kind.
+func (e EligibilityVerifiedEvent) Type() string { return EligibilityVerifiedEventType }
+
+// AggregateID ties the event back to the policy that produced it.
+func (e EligibilityVerifiedEvent) AggregateID() string { return e.PolicyID }
+
+// Compile-time assertion that EligibilityVerifiedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = EligibilityVerifiedEvent{}

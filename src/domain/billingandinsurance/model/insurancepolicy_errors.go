@@ -15,6 +15,13 @@ var (
 	// the coverage window's start or end date.
 	ErrMissingEffectiveDates = errors.New("insurancepolicy: effective dates are required")
 
+	// ErrMissingPolicyID is returned when VerifyEligibilityCmd omits the policy id.
+	ErrMissingPolicyID = errors.New("insurancepolicy: policy id is required")
+
+	// ErrMissingServiceDate is returned when VerifyEligibilityCmd omits the
+	// service date.
+	ErrMissingServiceDate = errors.New("insurancepolicy: service date is required")
+
 	// ErrEligibilityNotVerified is returned when a policy without a verified
 	// eligibility result would be registered. Invariant: a policy must have a
 	// verified eligibility result before it can adjust an invoice.
