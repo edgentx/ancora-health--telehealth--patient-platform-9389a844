@@ -51,6 +51,10 @@ type InsurancePolicyAggregate struct {
 	// zero value until the policy is registered.
 	EffectiveDates EffectiveDates
 
+	// VerifiedServiceDate is the service date the policy's eligibility was last
+	// verified for. It is empty until a VerifyEligibilityCmd succeeds.
+	VerifiedServiceDate string
+
 	// EligibilityNotVerified reports that the policy has no verified eligibility
 	// result. Invariant: a policy must have a verified eligibility result before it
 	// can adjust an invoice.
@@ -72,6 +76,8 @@ func (a *InsurancePolicyAggregate) Execute(cmd interface{}) ([]shared.DomainEven
 	switch c := cmd.(type) {
 	case RegisterInsurancePolicyCmd:
 		return a.registerInsurancePolicy(c)
+	case VerifyEligibilityCmd:
+		return a.verifyEligibility(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -139,4 +145,64 @@ func (a *InsurancePolicyAggregate) apply(evt PolicyRegisteredEvent) {
 	a.PatientID = evt.PatientID
 	a.PayerIdentifier = evt.PayerIdentifier
 	a.EffectiveDates = evt.EffectiveDates
+}
+
+// verifyEligibility handles VerifyEligibilityCmd: it validates the command
+// input, enforces the policy invariants, then emits an EligibilityVerifiedEvent
+// and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the policy id and service date must both be present.
+//   - Verified eligibility: a policy must have a verified eligibility result
+//     before it can adjust an invoice.
+//   - Single active primary: only one active primary policy may exist per patient
+//     at a time.
+//   - Not expired: an expired policy cannot be used for new eligibility checks.
+func (a *InsurancePolicyAggregate) verifyEligibility(cmd VerifyEligibilityCmd) ([]shared.DomainEvent, error) {
+	if cmd.PolicyId == "" {
+		return nil, ErrMissingPolicyID
+	}
+	if cmd.ServiceDate == "" {
+		return nil, ErrMissingServiceDate
+	}
+
+	// Invariant: a policy must have a verified eligibility result before it can
+	// adjust an invoice.
+	if a.EligibilityNotVerified {
+		return nil, ErrEligibilityNotVerified
+	}
+
+	// Invariant: only one active primary policy may exist per patient at a time.
+	if a.ActivePrimaryPolicyExists {
+		return nil, ErrActivePrimaryPolicyExists
+	}
+
+	// Invariant: an expired policy cannot be used for new eligibility checks.
+	if a.PolicyExpired {
+		return nil, ErrPolicyExpired
+	}
+
+	evt := EligibilityVerifiedEvent{
+		PolicyID:    a.ID,
+		ServiceDate: cmd.ServiceDate,
+	}
+
+	a.applyEligibilityVerified(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyEligibilityVerified mutates aggregate state from an
+// EligibilityVerifiedEvent. Like apply it is the single place these state
+// changes happen, so it serves both command handling and future event replay.
+//
+// A confirmed verification records the service date it covers and clears the
+// unverified-eligibility flag, so the policy now carries a verified eligibility
+// result.
+func (a *InsurancePolicyAggregate) applyEligibilityVerified(evt EligibilityVerifiedEvent) {
+	a.VerifiedServiceDate = evt.ServiceDate
+	a.EligibilityNotVerified = false
 }

@@ -28,3 +28,20 @@ type RegisterInsurancePolicyCmd struct {
 	// EffectiveDates is the coverage window the policy is effective for.
 	EffectiveDates EffectiveDates
 }
+
+// VerifyEligibilityCmd requests payer eligibility verification for a registered
+// policy as of a given service date. It carries the policy to check and the
+// date the coverage is being verified for.
+//
+// Verifying eligibility is the act that admits a policy's coverage into billing:
+// the policy must not already carry an unverified eligibility result blocking an
+// invoice adjustment, at most one active primary policy may exist per patient at
+// a time, and an expired policy cannot be used for new eligibility checks.
+// PolicyId identifies the policy to verify and ServiceDate the date coverage is
+// verified for. Both are mandatory.
+type VerifyEligibilityCmd struct {
+	// PolicyId identifies the policy whose eligibility is being verified.
+	PolicyId string
+	// ServiceDate is the date coverage is being verified for (RFC 3339 date).
+	ServiceDate string
+}
