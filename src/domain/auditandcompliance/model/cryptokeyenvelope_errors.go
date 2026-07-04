@@ -25,4 +25,8 @@ var (
 	// ErrMissingFieldClass is returned when IssueDataKeyCmd omits the field
 	// classification.
 	ErrMissingFieldClass = errors.New("crypto key envelope: field class is required")
+
+	// ErrMissingMasterKeyId is returned when RotateMasterKeyCmd omits the new
+	// master key id.
+	ErrMissingMasterKeyId = errors.New("crypto key envelope: new master key id is required")
 )

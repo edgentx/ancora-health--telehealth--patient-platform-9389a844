@@ -17,3 +17,19 @@ func (e DataKeyIssuedEvent) Type() string { return "crypto.datakey.issued" }
 
 // AggregateID ties the event back to the CryptoKeyEnvelope that produced it.
 func (e DataKeyIssuedEvent) AggregateID() string { return e.EnvelopeID }
+
+// MasterKeyRotatedEvent records that the envelope's active data encryption keys
+// were rewrapped under a new master (wrapping) key. Its Type() is the wire
+// contract "crypto.masterkey.rotated".
+type MasterKeyRotatedEvent struct {
+	// EnvelopeID is the identity of the CryptoKeyEnvelope that was rotated.
+	EnvelopeID string
+	// NewMasterKeyID identifies the master key the data keys are now wrapped by.
+	NewMasterKeyID string
+}
+
+// Type returns the wire event name emitted when the master key is rotated.
+func (e MasterKeyRotatedEvent) Type() string { return "crypto.masterkey.rotated" }
+
+// AggregateID ties the event back to the CryptoKeyEnvelope that produced it.
+func (e MasterKeyRotatedEvent) AggregateID() string { return e.EnvelopeID }
