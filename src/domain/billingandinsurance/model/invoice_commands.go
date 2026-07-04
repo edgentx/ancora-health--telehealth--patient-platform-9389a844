@@ -33,3 +33,43 @@ type GenerateInvoiceCmd struct {
 	// against.
 	PolicyId string
 }
+
+// EligibilityResult is the verified outcome of an insurance eligibility check:
+// the coverage the payer will adjudicate against the invoice's charges and the
+// copay the patient owes, both in whole cents. It is the input that
+// ApplyInsuranceAdjustmentCmd applies to reconcile patient responsibility.
+//
+// Verified reports whether the result came back from a completed eligibility
+// verification; only a verified result may be applied. The amounts are the
+// verified insurance adjustment (CoverageCents) and the patient copay
+// (CopayCents), and neither may be negative.
+type EligibilityResult struct {
+	// Verified reports that the eligibility check completed and its coverage and
+	// copay are trustworthy. An unverified result may not be applied.
+	Verified bool
+	// CoverageCents is the verified insurance adjustment the payer covers, in
+	// whole cents. It may not be negative.
+	CoverageCents int64
+	// CopayCents is the patient copay owed, in whole cents. It may not be
+	// negative.
+	CopayCents int64
+}
+
+// ApplyInsuranceAdjustmentCmd requests that a generated Invoice have its verified
+// insurance coverage and copay applied, reconciling the patient responsibility
+// against the invoice's charges.
+//
+// Applying the adjustment is the act that turns a raw claim into a
+// patient-owed balance: the invoice must have been generated from a completed
+// encounter, the resulting patient responsibility must equal charges minus the
+// verified insurance adjustment and copay, it may not be marked paid beyond its
+// outstanding balance, and a voided invoice may not receive further payments.
+// InvoiceId identifies the invoice being adjusted and Eligibility carries the
+// verified coverage and copay. Both are mandatory and the eligibility result
+// must be verified.
+type ApplyInsuranceAdjustmentCmd struct {
+	// InvoiceId identifies the generated invoice the adjustment is applied to.
+	InvoiceId string
+	// Eligibility is the verified coverage and copay to apply.
+	Eligibility EligibilityResult
+}

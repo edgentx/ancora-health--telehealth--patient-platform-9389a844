@@ -15,6 +15,9 @@ const (
 	// InvoiceStatusGenerated is an invoice that has been generated from a
 	// completed encounter and is now billable.
 	InvoiceStatusGenerated InvoiceStatus = "generated"
+	// InvoiceStatusAdjusted is a generated invoice whose verified insurance
+	// coverage and copay have been applied, reconciling patient responsibility.
+	InvoiceStatusAdjusted InvoiceStatus = "adjusted"
 )
 
 // InvoiceAggregate is the billing-and-insurance aggregate that tracks an invoice
@@ -69,6 +72,14 @@ type InvoiceAggregate struct {
 	// further payments. Invariant: a voided invoice cannot receive further
 	// payments.
 	Voided bool
+
+	// CoverageCents is the verified insurance adjustment applied to the invoice,
+	// in whole cents. It is zero until the adjustment is applied.
+	CoverageCents int64
+
+	// CopayCents is the patient copay applied to the invoice, in whole cents. It
+	// is zero until the adjustment is applied.
+	CopayCents int64
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
@@ -77,6 +88,8 @@ func (a *InvoiceAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, error
 	switch c := cmd.(type) {
 	case GenerateInvoiceCmd:
 		return a.generateInvoice(c)
+	case ApplyInsuranceAdjustmentCmd:
+		return a.applyInsuranceAdjustment(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -151,4 +164,74 @@ func (a *InvoiceAggregate) apply(evt InvoiceGeneratedEvent) {
 	a.EncounterID = evt.EncounterID
 	a.LineItems = evt.LineItems
 	a.PolicyID = evt.PolicyID
+}
+
+// applyInsuranceAdjustment handles ApplyInsuranceAdjustmentCmd: it validates the
+// command input, enforces the invoice invariants, then emits an
+// InvoiceAdjustedEvent and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the invoice id and a verified, non-negative eligibility
+//     result must be present.
+//   - Completed encounter: an invoice may only be generated from a completed
+//     encounter.
+//   - Patient responsibility: it must equal charges minus the verified insurance
+//     adjustment and copay.
+//   - Outstanding balance: an invoice cannot be marked paid for more than its
+//     outstanding balance.
+//   - Voided invoice: a voided invoice cannot receive further payments.
+func (a *InvoiceAggregate) applyInsuranceAdjustment(cmd ApplyInsuranceAdjustmentCmd) ([]shared.DomainEvent, error) {
+	if cmd.InvoiceId == "" {
+		return nil, ErrMissingInvoiceID
+	}
+	if !cmd.Eligibility.Verified {
+		return nil, ErrUnverifiedEligibility
+	}
+	if cmd.Eligibility.CoverageCents < 0 || cmd.Eligibility.CopayCents < 0 {
+		return nil, ErrNegativeAdjustment
+	}
+
+	// Invariant: an invoice may only be generated from a completed encounter.
+	if a.EncounterNotCompleted {
+		return nil, ErrEncounterNotCompleted
+	}
+
+	// Invariant: patient responsibility must equal charges minus verified
+	// insurance adjustment and copay.
+	if a.PatientResponsibilityMismatch {
+		return nil, ErrPatientResponsibilityMismatch
+	}
+
+	// Invariant: an invoice cannot be marked paid for more than its outstanding
+	// balance.
+	if a.PaymentExceedsOutstanding {
+		return nil, ErrPaymentExceedsOutstanding
+	}
+
+	// Invariant: a voided invoice cannot receive further payments.
+	if a.Voided {
+		return nil, ErrVoidedInvoicePayment
+	}
+
+	evt := InvoiceAdjustedEvent{
+		InvoiceID:     a.ID,
+		CoverageCents: cmd.Eligibility.CoverageCents,
+		CopayCents:    cmd.Eligibility.CopayCents,
+	}
+
+	a.applyAdjusted(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyAdjusted mutates aggregate state from an InvoiceAdjustedEvent. Like
+// apply, it is the single place adjustment state changes, so the same function
+// serves both command handling and future event replay.
+func (a *InvoiceAggregate) applyAdjusted(evt InvoiceAdjustedEvent) {
+	a.Status = InvoiceStatusAdjusted
+	a.CoverageCents = evt.CoverageCents
+	a.CopayCents = evt.CopayCents
 }
