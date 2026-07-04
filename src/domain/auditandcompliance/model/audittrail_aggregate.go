@@ -56,9 +56,88 @@ func (a *AuditTrailAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, er
 	switch c := cmd.(type) {
 	case AppendAuditEntryCmd:
 		return a.appendAuditEntry(c)
+	case VerifyChainIntegrityCmd:
+		return a.verifyChainIntegrity(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
+}
+
+// verifyChainIntegrity re-derives the hash of every entry in the inclusive
+// [FromSequence, ToSequence] window and compares it against the stored hash to
+// detect tampering. It is read-only: it never mutates the chain or bumps the
+// aggregate version.
+//
+// Structural invariants are enforced first, and a violation rejects the command
+// with a domain error because the window is malformed and cannot be assessed:
+//
+//   - Completeness: each entry must carry actor identity, resource, action and
+//     timestamp (ErrIncompleteAuditEntry).
+//   - Unbroken chain: each entry must reference the hash of its immediate
+//     predecessor, "" for the genesis entry (ErrAuditChainBroken).
+//   - Immutability: a given sealed hash may appear at most once; a repeat means
+//     an entry was rewritten in place (ErrAuditEntryImmutable).
+//
+// Only once the window is structurally sound does it assess content tampering:
+// recomputing each entry's hash from its sealed payload and reporting the first
+// divergence via a ChainTamperingDetectedEvent. An untampered window yields a
+// ChainIntegrityVerifiedEvent.
+func (a *AuditTrailAggregate) verifyChainIntegrity(cmd VerifyChainIntegrityCmd) ([]shared.DomainEvent, error) {
+	if cmd.FromSequence < 1 || cmd.ToSequence < cmd.FromSequence || cmd.ToSequence > len(a.entries) {
+		return nil, ErrInvalidSequenceRange
+	}
+
+	tamperedAt := 0
+	seen := make(map[string]struct{}, cmd.ToSequence-cmd.FromSequence+1)
+	for seq := cmd.FromSequence; seq <= cmd.ToSequence; seq++ {
+		entry := a.entries[seq-1]
+
+		if strings.TrimSpace(entry.ActorContext) == "" ||
+			strings.TrimSpace(entry.ResourceRef) == "" ||
+			strings.TrimSpace(entry.Action) == "" ||
+			entry.OccurredAt.IsZero() {
+			return nil, ErrIncompleteAuditEntry
+		}
+
+		// The predecessor of sequence 1 is the genesis reference ("").
+		var predecessorHash string
+		if seq > 1 {
+			predecessorHash = a.entries[seq-2].Hash
+		}
+		if entry.PrevHash != predecessorHash {
+			return nil, ErrAuditChainBroken
+		}
+
+		if _, dup := seen[entry.Hash]; dup {
+			return nil, ErrAuditEntryImmutable
+		}
+		seen[entry.Hash] = struct{}{}
+
+		recomputed := computeEntryHash(entry.PrevHash, entry.Sequence, entry.ActorContext, entry.ResourceRef, entry.Action, entry.OccurredAt)
+		if recomputed != entry.Hash && tamperedAt == 0 {
+			tamperedAt = seq
+		}
+	}
+
+	if tamperedAt != 0 {
+		evt := ChainTamperingDetectedEvent{
+			TrailID:      a.ID,
+			FromSequence: cmd.FromSequence,
+			ToSequence:   cmd.ToSequence,
+			TamperedAt:   tamperedAt,
+		}
+		a.AddEvent(evt)
+		return []shared.DomainEvent{evt}, nil
+	}
+
+	evt := ChainIntegrityVerifiedEvent{
+		TrailID:      a.ID,
+		FromSequence: cmd.FromSequence,
+		ToSequence:   cmd.ToSequence,
+		HeadHash:     a.entries[cmd.ToSequence-1].Hash,
+	}
+	a.AddEvent(evt)
+	return []shared.DomainEvent{evt}, nil
 }
 
 // appendAuditEntry seals a new access event and appends it to the chain,

@@ -26,3 +26,22 @@ type AppendAuditEntryCmd struct {
 	// PrevHash references the hash of the current chain head ("" for genesis).
 	PrevHash string
 }
+
+// VerifyChainIntegrityCmd requests a tamper check over a contiguous window of
+// the trail. The aggregate recomputes each entry's hash from its sealed payload
+// across the inclusive [FromSequence, ToSequence] range and compares it against
+// the stored hash: any divergence means the entry's contents were altered after
+// it was sealed.
+//
+// Both bounds are 1-based sequence numbers. FromSequence must be at least 1,
+// ToSequence must be at least FromSequence, and ToSequence must not exceed the
+// number of sealed entries; otherwise the command is rejected as an invalid
+// range. The check is read-only — it never mutates the chain — and yields either
+// a ChainIntegrityVerifiedEvent or, when tampering is found, a
+// ChainTamperingDetectedEvent.
+type VerifyChainIntegrityCmd struct {
+	// FromSequence is the 1-based sequence number of the first entry to verify.
+	FromSequence int
+	// ToSequence is the 1-based sequence number of the last entry to verify.
+	ToSequence int
+}
