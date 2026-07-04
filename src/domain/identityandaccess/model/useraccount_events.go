@@ -60,6 +60,29 @@ func (e UserAuthenticatedEvent) Type() string { return "user.authenticated" }
 // AggregateID ties the event back to the UserAccount that produced it.
 func (e UserAuthenticatedEvent) AggregateID() string { return e.UserID }
 
+// UserPasswordResetRequestedEvent records that a password reset was initiated for
+// a user account after passing every reset invariant. It carries the single-use
+// token and its expiry so downstream infrastructure can deliver the reset link
+// and later validate the token. Its Type() is the wire contract
+// "user.password.reset.requested".
+type UserPasswordResetRequestedEvent struct {
+	// UserID is the identity of the UserAccount the reset was requested for.
+	UserID string
+	// Email is the login email the reset was requested for.
+	Email string
+	// Token is the single-use password-reset token issued for this request.
+	Token string
+	// ExpiresAt is the instant the issued reset token expires, after which it can
+	// no longer change the credential.
+	ExpiresAt time.Time
+}
+
+// Type returns the wire event name emitted when a password reset is initiated.
+func (e UserPasswordResetRequestedEvent) Type() string { return "user.password.reset.requested" }
+
+// AggregateID ties the event back to the UserAccount that produced it.
+func (e UserPasswordResetRequestedEvent) AggregateID() string { return e.UserID }
+
 // UserLoginFailedEvent records that a login attempt cleared the authentication
 // invariants but presented a credential that did not match. It carries the
 // running failed-attempt count so credential-stuffing protection can decide when
