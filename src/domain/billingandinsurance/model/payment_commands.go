@@ -19,3 +19,25 @@ type InitiatePaymentCmd struct {
 	// AmountCents is the amount to capture, in whole cents. It must be positive.
 	AmountCents int64
 }
+
+// ReconcilePaymentCmd applies a verified gateway webhook result to a Payment,
+// advancing its lifecycle to reconciled. It carries the payment being
+// reconciled, the raw webhook payload delivered by the gateway, and the HMAC
+// signature the gateway computed over that payload.
+//
+// Reconciliation is a status advance, so it is bound by the same invariants as
+// initiation: it never persists raw card data — only gateway tokens — it may
+// only be captured against an outstanding invoice balance, and, crucially, the
+// status may only advance on an HMAC-verified webhook from the gateway.
+// PaymentId identifies the payment, WebhookPayload is the gateway's message,
+// and Signature is its HMAC. All three are mandatory.
+type ReconcilePaymentCmd struct {
+	// PaymentId identifies the payment being reconciled.
+	PaymentId string
+	// WebhookPayload is the raw message the gateway delivered describing the
+	// charge outcome. It is the bytes the HMAC signature is computed over.
+	WebhookPayload string
+	// Signature is the HMAC the gateway computed over WebhookPayload. A payment's
+	// status may only advance on a webhook whose signature verifies.
+	Signature string
+}
