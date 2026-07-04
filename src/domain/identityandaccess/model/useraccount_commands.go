@@ -26,3 +26,13 @@ type LockAccountCmd struct {
 	// threshold exceeded").
 	Reason string
 }
+
+// InitiatePasswordResetCmd requests that a single-use password-reset token be
+// issued for a UserAccount. It carries the login email the reset was requested
+// for; the account identity is taken from the aggregate the command is executed
+// against.
+type InitiatePasswordResetCmd struct {
+	// Email is the login email the password reset was requested for. It must be
+	// present for the command to be accepted.
+	Email string
+}
