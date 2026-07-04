@@ -56,6 +56,8 @@ func (a *UserAccountAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 	switch c := cmd.(type) {
 	case RegisterUserCmd:
 		return a.registerUser(c)
+	case LockAccountCmd:
+		return a.lockAccount(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -124,6 +126,65 @@ func (a *UserAccountAggregate) apply(evt UserRegisteredEvent) {
 	a.Email = evt.Email
 	a.Role = evt.Role
 	a.EmailRegistered = true
+}
+
+// lockoutWindow is how long a credential-stuffing lock holds before the account
+// may authenticate again.
+const lockoutWindow = 15 * time.Minute
+
+// lockAccount handles LockAccountCmd: it validates the command input, enforces
+// the account invariants, then emits a UserAccountLockedEvent and buffers it on
+// the aggregate. The invariant guards mirror registerUser so the strongest
+// prohibitions (a duplicate email or an already-active lockout) are reported
+// before the credential and MFA checks.
+func (a *UserAccountAggregate) lockAccount(cmd LockAccountCmd) ([]shared.DomainEvent, error) {
+	if strings.TrimSpace(cmd.AccountId) == "" {
+		return nil, ErrMissingAccountID
+	}
+	if strings.TrimSpace(cmd.Reason) == "" {
+		return nil, ErrMissingReason
+	}
+
+	// Invariant: email must be unique per tenant and cannot be reused by an
+	// active account.
+	if a.EmailRegistered {
+		return nil, ErrEmailAlreadyRegistered
+	}
+	// Invariant: an account locked by credential-stuffing protection cannot
+	// authenticate until the lockout window elapses.
+	if !a.LockedUntil.IsZero() && a.LockedUntil.After(time.Now()) {
+		return nil, ErrAccountLocked
+	}
+	// Invariant: a password reset token is single-use and must be unexpired to
+	// change the credential.
+	if a.ResetTokenConsumed ||
+		(!a.ResetTokenExpiresAt.IsZero() && !a.ResetTokenExpiresAt.After(time.Now())) {
+		return nil, ErrResetTokenInvalid
+	}
+	// Invariant: MFA-enrolled accounts must present a valid second factor before
+	// a session is issued.
+	if a.MFAEnrolled && !a.SecondFactorVerified {
+		return nil, ErrSecondFactorRequired
+	}
+
+	evt := UserAccountLockedEvent{
+		UserID:      a.ID,
+		Reason:      cmd.Reason,
+		LockedUntil: time.Now().Add(lockoutWindow),
+	}
+
+	a.applyLocked(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyLocked mutates aggregate state from a UserAccountLockedEvent, opening the
+// credential-stuffing lockout window. Keeping mutation here lets the same event
+// drive both command handling and future replay when rehydrating from the store.
+func (a *UserAccountAggregate) applyLocked(evt UserAccountLockedEvent) {
+	a.LockedUntil = evt.LockedUntil
 }
 
 // routeForRole resolves the landing route an account is directed to based on its

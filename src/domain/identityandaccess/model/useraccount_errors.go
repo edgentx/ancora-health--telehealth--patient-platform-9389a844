@@ -35,4 +35,10 @@ var (
 
 	// ErrMissingTenant is returned when RegisterUserCmd omits the tenant id.
 	ErrMissingTenant = errors.New("user account: tenant id is required")
+
+	// ErrMissingAccountID is returned when LockAccountCmd omits the account id.
+	ErrMissingAccountID = errors.New("user account: account id is required")
+
+	// ErrMissingReason is returned when LockAccountCmd omits the lock reason.
+	ErrMissingReason = errors.New("user account: lock reason is required")
 )
