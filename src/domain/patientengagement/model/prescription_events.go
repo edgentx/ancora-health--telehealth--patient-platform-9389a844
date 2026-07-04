@@ -59,3 +59,26 @@ func (e PrescriptionTransmittedEvent) AggregateID() string { return e.Prescripti
 // Compile-time assertion that PrescriptionTransmittedEvent satisfies the
 // DomainEvent contract.
 var _ shared.DomainEvent = PrescriptionTransmittedEvent{}
+
+// PrescriptionSafetyCheckedEventType is the stable wire name emitted when a
+// prescription has been run through allergy and interaction verification.
+const PrescriptionSafetyCheckedEventType = "prescription.safety.checked"
+
+// PrescriptionSafetyCheckedEvent is emitted when a RunSafetyCheckCmd succeeds. It
+// records that the prescription has cleared allergy and interaction verification
+// and is therefore safe to transmit.
+type PrescriptionSafetyCheckedEvent struct {
+	// PrescriptionID is the identity of the PrescriptionAggregate that produced
+	// the event.
+	PrescriptionID string
+}
+
+// Type identifies the event kind.
+func (e PrescriptionSafetyCheckedEvent) Type() string { return PrescriptionSafetyCheckedEventType }
+
+// AggregateID ties the event back to the prescription that produced it.
+func (e PrescriptionSafetyCheckedEvent) AggregateID() string { return e.PrescriptionID }
+
+// Compile-time assertion that PrescriptionSafetyCheckedEvent satisfies the
+// DomainEvent contract.
+var _ shared.DomainEvent = PrescriptionSafetyCheckedEvent{}

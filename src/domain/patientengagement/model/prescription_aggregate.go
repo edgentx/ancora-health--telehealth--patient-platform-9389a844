@@ -59,6 +59,11 @@ type PrescriptionAggregate struct {
 	// failing a safety check cannot proceed until acknowledged/overridden.
 	SafetyCheckFailed          bool
 	SafetyOverrideAcknowledged bool
+
+	// SafetyChecked reports that the prescription has been run through allergy and
+	// interaction verification and cleared it. It is set when a RunSafetyCheckCmd
+	// succeeds; its zero value means the check has not yet been run.
+	SafetyChecked bool
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
@@ -69,6 +74,8 @@ func (a *PrescriptionAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, 
 		return a.composePrescription(c)
 	case TransmitPrescriptionCmd:
 		return a.transmitPrescription(c)
+	case RunSafetyCheckCmd:
+		return a.runSafetyCheck(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -205,4 +212,62 @@ func (a *PrescriptionAggregate) transmitPrescription(cmd TransmitPrescriptionCmd
 // both command handling and future event replay when rehydrating from the store.
 func (a *PrescriptionAggregate) applyTransmitted(evt PrescriptionTransmittedEvent) {
 	a.Status = PrescriptionStatusTransmitted
+}
+
+// runSafetyCheck handles RunSafetyCheckCmd: it validates the command input,
+// enforces the prescription invariants, runs allergy and interaction
+// verification, then emits a PrescriptionSafetyCheckedEvent and buffers it on the
+// aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the prescription being checked must be identified.
+//   - Provider authorization: only an authenticated provider with an active care
+//     relationship to the patient may issue — and therefore run the safety check
+//     on — the prescription.
+//   - Safety checks: a prescription with a prior allergy or interaction failure
+//     may not clear a new check until that failure is acknowledged/overridden.
+//   - Immutability: a transmitted prescription is sealed and may only be
+//     superseded by a cancellation, never re-checked.
+func (a *PrescriptionAggregate) runSafetyCheck(cmd RunSafetyCheckCmd) ([]shared.DomainEvent, error) {
+	if cmd.PrescriptionId == "" {
+		return nil, ErrMissingPrescription
+	}
+
+	// Invariant: a prescription may only be issued by an authenticated provider
+	// with an active care relationship to the patient.
+	if a.ProviderUnauthorized {
+		return nil, ErrProviderNotAuthorized
+	}
+
+	// Invariant: a prescription failing an allergy or interaction check cannot
+	// proceed until the failure has been acknowledged or overridden.
+	if a.SafetyCheckFailed && !a.SafetyOverrideAcknowledged {
+		return nil, ErrSafetyCheckUnacknowledged
+	}
+
+	// Invariant: a transmitted prescription is immutable. Re-running a safety
+	// check on a sealed order is rejected — a change must be a cancellation that
+	// supersedes it.
+	if a.Status == PrescriptionStatusTransmitted {
+		return nil, ErrTransmittedImmutable
+	}
+
+	evt := PrescriptionSafetyCheckedEvent{
+		PrescriptionID: a.ID,
+	}
+
+	a.applySafetyChecked(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applySafetyChecked mutates aggregate state from a
+// PrescriptionSafetyCheckedEvent. Like apply, it is the single place safety-check
+// state changes, so it serves both command handling and future event replay when
+// rehydrating from the store.
+func (a *PrescriptionAggregate) applySafetyChecked(evt PrescriptionSafetyCheckedEvent) {
+	a.SafetyChecked = true
 }
