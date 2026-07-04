@@ -39,6 +39,8 @@ func (a *AnalyticsDashboardAggregate) Execute(cmd interface{}) ([]shared.DomainE
 	switch c := cmd.(type) {
 	case ComputeRollupCmd:
 		return a.computeRollup(c)
+	case QueryDashboardCmd:
+		return a.queryDashboard(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -107,5 +109,72 @@ func (a *AnalyticsDashboardAggregate) computeRollup(cmd ComputeRollupCmd) ([]sha
 // event replay when rehydrating the aggregate from the store. A computed rollup
 // records no additional state on the aggregate beyond the event itself.
 func (a *AnalyticsDashboardAggregate) apply(evt RollupComputedEvent) {
+	_ = evt
+}
+
+// queryDashboard handles QueryDashboardCmd: it validates the command input,
+// enforces the dashboard invariants, then emits a DashboardQueriedEvent and
+// buffers it on the aggregate.
+//
+// A query reads back the rollup a dashboard exposes, so it enforces the same
+// guards as computing that rollup, in order:
+//
+//   - Completeness: the clinic id, a complete date range, and the metric type
+//     must all be present.
+//   - Scope: a rollup must be computed only from events within its declared
+//     clinic/date scope.
+//   - PHI: dashboards must never expose patient-identifiable PHI, only
+//     aggregates.
+//   - Reproducibility: a rollup's totals must be reproducible from its source
+//     event window.
+func (a *AnalyticsDashboardAggregate) queryDashboard(cmd QueryDashboardCmd) ([]shared.DomainEvent, error) {
+	if cmd.ClinicId == "" {
+		return nil, ErrMissingClinic
+	}
+	if cmd.DateRange.Start == "" || cmd.DateRange.End == "" {
+		return nil, ErrMissingDateRange
+	}
+	if cmd.MetricType == "" {
+		return nil, ErrMissingMetricType
+	}
+
+	// Invariant: a rollup must be computed only from events within its declared
+	// clinic/date scope.
+	if a.RollupOutOfScope {
+		return nil, ErrRollupOutOfScope
+	}
+
+	// Invariant: dashboards must never expose patient-identifiable PHI, only
+	// aggregates.
+	if a.ExposesPHI {
+		return nil, ErrPHIExposed
+	}
+
+	// Invariant: a rollup's totals must be reproducible from its source event
+	// window.
+	if a.RollupNotReproducible {
+		return nil, ErrRollupNotReproducible
+	}
+
+	evt := DashboardQueriedEvent{
+		DashboardID: a.ID,
+		ClinicID:    cmd.ClinicId,
+		RangeStart:  cmd.DateRange.Start,
+		RangeEnd:    cmd.DateRange.End,
+		MetricType:  cmd.MetricType,
+	}
+
+	a.applyQueried(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyQueried mutates aggregate state from a DashboardQueriedEvent. Like apply,
+// it is the single place a query's state changes, so the same function serves
+// both command handling and future event replay. A query records no additional
+// state on the aggregate beyond the event itself.
+func (a *AnalyticsDashboardAggregate) applyQueried(evt DashboardQueriedEvent) {
 	_ = evt
 }

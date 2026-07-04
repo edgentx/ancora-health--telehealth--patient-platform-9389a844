@@ -30,3 +30,25 @@ type ComputeRollupCmd struct {
 	// revenue total).
 	MetricType string
 }
+
+// QueryDashboardCmd requests the filtered rollup a dashboard exposes for a
+// scope, capturing the clinic the query is scoped to, the date window it covers,
+// and the metric being read.
+//
+// Querying a dashboard reads back the aggregate figure a rollup produced over a
+// window of source events. Because a query surfaces that rollup, it carries the
+// same three invariants the rollup does: a rollup must be computed only from
+// events within its declared clinic/date scope, dashboards must never expose
+// patient-identifiable PHI (only aggregates), and a rollup's totals must be
+// reproducible from its source event window. ClinicId identifies the clinic the
+// query is scoped to, DateRange the window it covers, and MetricType the metric
+// being read. All three are mandatory.
+type QueryDashboardCmd struct {
+	// ClinicId identifies the clinic the query is scoped to.
+	ClinicId string
+	// DateRange is the date window the query covers.
+	DateRange DateRange
+	// MetricType is the metric being read (for example a visit count or a revenue
+	// total).
+	MetricType string
+}
