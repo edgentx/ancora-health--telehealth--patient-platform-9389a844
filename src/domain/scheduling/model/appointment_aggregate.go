@@ -4,25 +4,150 @@ package model
 
 import "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/shared"
 
+// AppointmentStatus is the lifecycle state of an appointment. The zero value is
+// an open (unbooked) appointment, which is what HoldSlotCmd acts on.
+type AppointmentStatus string
+
+const (
+	// AppointmentStatusOpen is an appointment that has not yet reserved a slot. It
+	// is the zero value, so a freshly constructed aggregate is open.
+	AppointmentStatusOpen AppointmentStatus = ""
+	// AppointmentStatusHeld is an appointment holding a hold lock over a slot that
+	// must be confirmed before the lock expires or it is released.
+	AppointmentStatusHeld AppointmentStatus = "held"
+)
+
 // AppointmentAggregate is the scheduling Appointment aggregate. It embeds
 // shared.AggregateRoot for version tracking and an uncommitted-event buffer,
 // and carries its own string identity.
 //
-// This is the scaffold stub: it holds only its identity and recognizes no
-// commands yet. Later scheduling stories add command handlers and the state
-// their invariants read.
+// Beyond identity it tracks the state that command invariants read: its
+// lifecycle status, the provider/patient and slot it is scoped to, and the flags
+// describing whether the slot lies within the provider's published availability,
+// whether the slot is already claimed by another appointment, whether a prior
+// hold lock has expired without confirmation, and whether the action falls
+// within the configured reschedule/cancel policy window.
+//
+// The invariant flags follow the repository convention that a freshly
+// constructed aggregate is valid: their zero value is the compliant state, and a
+// non-zero value marks a violation the guards reject.
 type AppointmentAggregate struct {
 	shared.AggregateRoot
 	ID string
+
+	// Status is the appointment's lifecycle state.
+	Status AppointmentStatus
+
+	// ScopedProviderID, ScopedPatientID and HeldTimeSlot are the participants and
+	// slot the appointment is bound to. They are empty until a slot is held, at
+	// which point the appointment is scoped to the holding provider, patient and
+	// slot.
+	ScopedProviderID string
+	ScopedPatientID  string
+	HeldTimeSlot     string
+
+	// SlotOutsideAvailability reports that the requested slot falls outside the
+	// provider's published availability. Invariant: an appointment cannot be
+	// booked outside the provider's published availability.
+	SlotOutsideAvailability bool
+
+	// SlotAlreadyBooked reports that the slot is already held or booked by another
+	// appointment. Invariant: a slot may be booked by at most one appointment at a
+	// time (no double-booking).
+	SlotAlreadyBooked bool
+
+	// HoldLockExpired reports that a prior hold lock over the slot expired without
+	// confirmation and the slot was not released. Invariant: a held slot must be
+	// confirmed before its hold lock expires or it is released.
+	HoldLockExpired bool
+
+	// OutsidePolicyWindow reports that the action falls outside the configured
+	// reschedule/cancel policy window. Invariant: reschedule and cancel are only
+	// permitted within the configured policy window.
+	OutsidePolicyWindow bool
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
-// produced. The scaffold recognizes no commands yet, so every input falls
-// through to shared.ErrUnknownCommand. Later stories add case arms for the
-// concrete command types.
+// produced. Unrecognized command types return shared.ErrUnknownCommand.
 func (a *AppointmentAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, error) {
-	switch cmd.(type) {
+	switch c := cmd.(type) {
+	case HoldSlotCmd:
+		return a.holdSlot(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
+}
+
+// holdSlot handles HoldSlotCmd: it validates the command input, enforces the
+// scheduling invariants, then emits an AppointmentSlotHeldEvent and buffers it on
+// the aggregate. Acquiring the hold is the distributed-lock reservation that
+// stops any other appointment from claiming the slot while booking completes.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: provider, time slot and patient must all be present.
+//   - Provider availability: the slot must fall within the provider's published
+//     availability.
+//   - Double-booking: a slot may be held by at most one appointment at a time.
+//   - Hold-lock expiry: a slot whose prior hold lock expired without confirmation
+//     must have been released before it can be held again.
+//   - Policy window: reschedule/cancel activity is only permitted within the
+//     configured policy window.
+func (a *AppointmentAggregate) holdSlot(cmd HoldSlotCmd) ([]shared.DomainEvent, error) {
+	if cmd.ProviderId == "" {
+		return nil, ErrMissingProvider
+	}
+	if cmd.TimeSlot == "" {
+		return nil, ErrMissingTimeSlot
+	}
+	if cmd.PatientId == "" {
+		return nil, ErrMissingPatient
+	}
+
+	// Invariant: an appointment cannot be booked outside the provider's published
+	// availability.
+	if a.SlotOutsideAvailability {
+		return nil, ErrSlotOutsideAvailability
+	}
+
+	// Invariant: a slot may be booked by at most one appointment at a time — the
+	// hold lock is what makes the reservation exclusive.
+	if a.SlotAlreadyBooked {
+		return nil, ErrSlotDoubleBooked
+	}
+
+	// Invariant: a held slot must be confirmed before its hold lock expires or it
+	// is released; an expired-but-unreleased lock cannot be re-held.
+	if a.HoldLockExpired {
+		return nil, ErrHoldLockExpired
+	}
+
+	// Invariant: reschedule and cancel are only permitted within the configured
+	// policy window.
+	if a.OutsidePolicyWindow {
+		return nil, ErrOutsidePolicyWindow
+	}
+
+	evt := AppointmentSlotHeldEvent{
+		AppointmentID: a.ID,
+		ProviderID:    cmd.ProviderId,
+		TimeSlot:      cmd.TimeSlot,
+		PatientID:     cmd.PatientId,
+	}
+
+	a.apply(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// apply mutates aggregate state from a domain event. It is the single place
+// state changes, so the same function serves both command handling and future
+// event replay when rehydrating the aggregate from the store.
+func (a *AppointmentAggregate) apply(evt AppointmentSlotHeldEvent) {
+	a.Status = AppointmentStatusHeld
+	a.ScopedProviderID = evt.ProviderID
+	a.ScopedPatientID = evt.PatientID
+	a.HeldTimeSlot = evt.TimeSlot
 }
