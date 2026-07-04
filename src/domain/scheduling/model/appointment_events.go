@@ -60,3 +60,36 @@ func (e AppointmentRescheduledEvent) AggregateID() string { return e.Appointment
 // Compile-time assertion that AppointmentRescheduledEvent satisfies the
 // DomainEvent contract.
 var _ shared.DomainEvent = AppointmentRescheduledEvent{}
+
+// AppointmentWalkInRegisteredEventType is the stable wire name emitted when an
+// unscheduled walk-in patient is registered with a provider at a clinic.
+const AppointmentWalkInRegisteredEventType = "appointment.walkin.registered"
+
+// AppointmentWalkInRegisteredEvent is emitted when a RegisterWalkInCmd succeeds.
+// It records the patient that was registered, the clinic they presented at, and
+// the provider they were registered with. Its emission brings the walk-in into
+// the held state that must still be confirmed before its hold lock expires or it
+// is released.
+type AppointmentWalkInRegisteredEvent struct {
+	// AppointmentID is the identity of the AppointmentAggregate that produced the
+	// event.
+	AppointmentID string
+	// PatientID is the walk-in patient that was registered.
+	PatientID string
+	// ClinicID is the clinic the patient presented at.
+	ClinicID string
+	// ProviderID is the provider the walk-in was registered with.
+	ProviderID string
+}
+
+// Type identifies the event kind.
+func (e AppointmentWalkInRegisteredEvent) Type() string {
+	return AppointmentWalkInRegisteredEventType
+}
+
+// AggregateID ties the event back to the appointment that produced it.
+func (e AppointmentWalkInRegisteredEvent) AggregateID() string { return e.AppointmentID }
+
+// Compile-time assertion that AppointmentWalkInRegisteredEvent satisfies the
+// DomainEvent contract.
+var _ shared.DomainEvent = AppointmentWalkInRegisteredEvent{}

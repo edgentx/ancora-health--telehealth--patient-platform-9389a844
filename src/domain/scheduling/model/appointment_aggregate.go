@@ -75,6 +75,8 @@ func (a *AppointmentAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 		return a.holdSlot(c)
 	case RescheduleAppointmentCmd:
 		return a.rescheduleAppointment(c)
+	case RegisterWalkInCmd:
+		return a.registerWalkIn(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -205,6 +207,71 @@ func (a *AppointmentAggregate) rescheduleAppointment(cmd RescheduleAppointmentCm
 	return []shared.DomainEvent{evt}, nil
 }
 
+// registerWalkIn handles RegisterWalkInCmd: it validates the command input,
+// enforces the scheduling invariants, then emits an
+// AppointmentWalkInRegisteredEvent and buffers it on the aggregate. Registering a
+// walk-in books the unscheduled patient onto the provider on the spot, so the
+// same guards that gate an initial hold gate the registration.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: patient, clinic and provider must all be present.
+//   - Provider availability: the slot must fall within the provider's published
+//     availability.
+//   - Double-booking: a slot may be booked by at most one appointment at a time.
+//   - Hold-lock expiry: a slot whose prior hold lock expired without confirmation
+//     must have been released before the walk-in can be registered onto it.
+//   - Policy window: registration is only permitted within the configured policy
+//     window.
+func (a *AppointmentAggregate) registerWalkIn(cmd RegisterWalkInCmd) ([]shared.DomainEvent, error) {
+	if cmd.PatientId == "" {
+		return nil, ErrMissingPatient
+	}
+	if cmd.ClinicId == "" {
+		return nil, ErrMissingClinic
+	}
+	if cmd.ProviderId == "" {
+		return nil, ErrMissingProvider
+	}
+
+	// Invariant: an appointment cannot be booked outside the provider's published
+	// availability.
+	if a.SlotOutsideAvailability {
+		return nil, ErrSlotOutsideAvailability
+	}
+
+	// Invariant: a slot may be booked by at most one appointment at a time — the
+	// walk-in cannot register onto a slot already claimed by another appointment.
+	if a.SlotAlreadyBooked {
+		return nil, ErrSlotDoubleBooked
+	}
+
+	// Invariant: a held slot must be confirmed before its hold lock expires or it
+	// is released; an expired-but-unreleased lock blocks the registration.
+	if a.HoldLockExpired {
+		return nil, ErrHoldLockExpired
+	}
+
+	// Invariant: reschedule and cancel are only permitted within the configured
+	// policy window.
+	if a.OutsidePolicyWindow {
+		return nil, ErrOutsidePolicyWindow
+	}
+
+	evt := AppointmentWalkInRegisteredEvent{
+		AppointmentID: a.ID,
+		PatientID:     cmd.PatientId,
+		ClinicID:      cmd.ClinicId,
+		ProviderID:    cmd.ProviderId,
+	}
+
+	a.applyWalkInRegistered(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -222,4 +289,15 @@ func (a *AppointmentAggregate) apply(evt AppointmentSlotHeldEvent) {
 func (a *AppointmentAggregate) applyRescheduled(evt AppointmentRescheduledEvent) {
 	a.Status = AppointmentStatusHeld
 	a.HeldTimeSlot = evt.NewTimeSlot
+}
+
+// applyWalkInRegistered mutates aggregate state from an
+// AppointmentWalkInRegisteredEvent. It scopes the appointment to the walk-in's
+// patient and provider and moves it into the held state, mirroring apply as the
+// single mutation point for the walk-in event during both command handling and
+// replay.
+func (a *AppointmentAggregate) applyWalkInRegistered(evt AppointmentWalkInRegisteredEvent) {
+	a.Status = AppointmentStatusHeld
+	a.ScopedProviderID = evt.ProviderID
+	a.ScopedPatientID = evt.PatientID
 }
