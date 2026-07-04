@@ -30,6 +30,11 @@ type ClinicDirectoryAggregate struct {
 	// entry leaves the set unchanged.
 	SpecialtyCodes []string
 
+	// ClinicIDs are the clinic identities already configured in the directory.
+	// ConfigureClinicCmd appends a newly created identity here; updating an
+	// existing entry leaves the set unchanged.
+	ClinicIDs []string
+
 	// ProviderNotBookable reports that the provider being registered is not
 	// assigned to any clinic. Invariant: a provider must be assigned to at least
 	// one clinic to be bookable.
@@ -54,6 +59,8 @@ func (a *ClinicDirectoryAggregate) Execute(cmd interface{}) ([]shared.DomainEven
 		return a.registerProvider(c)
 	case ManageSpecialtyCmd:
 		return a.manageSpecialty(c)
+	case ConfigureClinicCmd:
+		return a.configureClinic(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -168,6 +175,60 @@ func (a *ClinicDirectoryAggregate) manageSpecialty(cmd ManageSpecialtyCmd) ([]sh
 	return []shared.DomainEvent{evt}, nil
 }
 
+// configureClinic handles ConfigureClinicCmd: it validates the command input,
+// enforces the directory invariants, then emits a ClinicConfiguredEvent and
+// buffers it on the aggregate.
+//
+// The command is an upsert — a clinic identity not yet in the directory is
+// created and one already present has its operating hours updated — so a single
+// clinic.configured event covers both paths.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the clinic identity and operating hours must both be present.
+//   - Bookable: a provider must be assigned to at least one clinic to be
+//     bookable.
+//   - Unique specialty: a specialty code must be unique within the directory.
+//   - Clinic deactivation: a clinic cannot be deactivated while it has future
+//     booked appointments.
+func (a *ClinicDirectoryAggregate) configureClinic(cmd ConfigureClinicCmd) ([]shared.DomainEvent, error) {
+	if cmd.ClinicIdentity == "" {
+		return nil, ErrMissingClinicIdentity
+	}
+	if cmd.OperatingHours == "" {
+		return nil, ErrMissingOperatingHours
+	}
+
+	// Invariant: a provider must be assigned to at least one clinic to be
+	// bookable.
+	if a.ProviderNotBookable {
+		return nil, ErrProviderNotBookable
+	}
+
+	// Invariant: a specialty code must be unique within the directory.
+	if a.DuplicateSpecialtyCode {
+		return nil, ErrDuplicateSpecialtyCode
+	}
+
+	// Invariant: a clinic cannot be deactivated while it has future booked
+	// appointments.
+	if a.ClinicDeactivationBlocked {
+		return nil, ErrClinicDeactivationBlocked
+	}
+
+	evt := ClinicConfiguredEvent{
+		DirectoryID:    a.ID,
+		ClinicIdentity: cmd.ClinicIdentity,
+		OperatingHours: cmd.OperatingHours,
+	}
+
+	a.applyClinicConfigured(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -186,4 +247,17 @@ func (a *ClinicDirectoryAggregate) applySpecialtyUpdated(evt SpecialtyUpdatedEve
 		}
 	}
 	a.SpecialtyCodes = append(a.SpecialtyCodes, evt.SpecialtyCode)
+}
+
+// applyClinicConfigured mutates aggregate state from a ClinicConfiguredEvent.
+// Because the command is an upsert, a clinic identity already present is left in
+// place (the update only changes its operating hours, which the aggregate does
+// not index) and only a newly created identity is appended to the registry.
+func (a *ClinicDirectoryAggregate) applyClinicConfigured(evt ClinicConfiguredEvent) {
+	for _, id := range a.ClinicIDs {
+		if id == evt.ClinicIdentity {
+			return
+		}
+	}
+	a.ClinicIDs = append(a.ClinicIDs, evt.ClinicIdentity)
 }
