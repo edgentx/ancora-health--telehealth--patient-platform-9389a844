@@ -28,6 +28,16 @@ type ClinicalNote struct {
 	Signed bool
 }
 
+// Addendum is a correction appended to a signed SOAP note. Because a signed note
+// is immutable, corrections are recorded as addenda rather than edits to the
+// note body.
+type Addendum struct {
+	// AuthorID is the participant who authored the addendum.
+	AuthorID string
+	// Text is the body of the correction.
+	Text string
+}
+
 // Diagnosis is a coded finding recorded on the encounter. Code must reference a
 // valid coded terminology entry (e.g., an ICD-10 code).
 type Diagnosis struct {
@@ -66,6 +76,10 @@ type EncounterAggregate struct {
 
 	// Diagnoses are the coded diagnoses recorded on the encounter.
 	Diagnoses []Diagnosis
+
+	// Addenda are the corrections appended to the encounter's signed note, in the
+	// order they were authored.
+	Addenda []Addendum
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
@@ -74,6 +88,8 @@ func (a *EncounterAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, err
 	switch c := cmd.(type) {
 	case OpenEncounterCmd:
 		return a.openEncounter(c)
+	case AppendAddendumCmd:
+		return a.appendAddendum(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -147,6 +163,70 @@ func (a *EncounterAggregate) openEncounter(cmd OpenEncounterCmd) ([]shared.Domai
 	return []shared.DomainEvent{evt}, nil
 }
 
+// appendAddendum handles AppendAddendumCmd: it validates the command input,
+// enforces the encounter invariants, then emits an
+// EncounterAddendumAppendedEvent and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: encounter, addendum text and author must all be present.
+//   - Participant scope: only participants the encounter is scoped to may amend
+//     the in-call notes.
+//   - Note immutability: an addendum may only be appended to a signed note —
+//     corrections are addenda, not edits, so an unsigned or absent note has
+//     nothing to amend.
+//   - Coded diagnoses: every recorded diagnosis must reference a coded
+//     terminology entry.
+//   - Completion integrity: a completed encounter must carry a signed note.
+func (a *EncounterAggregate) appendAddendum(cmd AppendAddendumCmd) ([]shared.DomainEvent, error) {
+	if cmd.EncounterId == "" {
+		return nil, ErrMissingEncounter
+	}
+	if cmd.AddendumText == "" {
+		return nil, ErrMissingAddendumText
+	}
+	if cmd.AuthorId == "" {
+		return nil, ErrMissingAuthor
+	}
+
+	// Invariant: only participants scoped to the encounter may view or amend the
+	// in-call notes, so the author must be one of them.
+	if a.ScopedProviderID != cmd.AuthorId && a.ScopedPatientID != cmd.AuthorId {
+		return nil, ErrParticipantNotScoped
+	}
+
+	// Invariant: a signed SOAP note is immutable — corrections must be appended as
+	// addenda, not edits. That mechanism only applies once a note is signed; an
+	// unsigned or absent note has nothing to amend.
+	if a.Note == nil || !a.Note.Signed {
+		return nil, ErrNoSignedNoteToAmend
+	}
+
+	// Invariant: every diagnosis must reference a coded terminology entry.
+	for _, d := range a.Diagnoses {
+		if d.Code == "" {
+			return nil, ErrDiagnosisUncoded
+		}
+	}
+
+	// Invariant: an encounter cannot be complete without a signed note.
+	if a.Status == EncounterStatusCompleted && (a.Note == nil || !a.Note.Signed) {
+		return nil, ErrIncompleteWithoutSignedNote
+	}
+
+	evt := EncounterAddendumAppendedEvent{
+		EncounterID:  a.ID,
+		AuthorID:     cmd.AuthorId,
+		AddendumText: cmd.AddendumText,
+	}
+
+	a.applyAddendumAppended(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -155,6 +235,17 @@ func (a *EncounterAggregate) apply(evt EncounterOpenedEvent) {
 	a.ScopedProviderID = evt.ProviderID
 	a.ScopedPatientID = evt.PatientID
 	a.VideoRoomID = evt.VideoRoomID
+}
+
+// applyAddendumAppended mutates aggregate state from an
+// EncounterAddendumAppendedEvent by recording the correction. Go has no method
+// overloading, so each event kind gets its own apply* method; keeping the
+// mutation here means command handling and future event replay share one path.
+func (a *EncounterAggregate) applyAddendumAppended(evt EncounterAddendumAppendedEvent) {
+	a.Addenda = append(a.Addenda, Addendum{
+		AuthorID: evt.AuthorID,
+		Text:     evt.AddendumText,
+	})
 }
 
 // provisionVideoRoomID derives the deterministic identifier of the video room

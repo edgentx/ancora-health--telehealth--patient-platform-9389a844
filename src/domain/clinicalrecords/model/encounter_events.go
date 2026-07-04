@@ -32,3 +32,30 @@ func (e EncounterOpenedEvent) AggregateID() string { return e.EncounterID }
 // Compile-time assertion that EncounterOpenedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = EncounterOpenedEvent{}
+
+// EncounterAddendumAppendedEventType is the stable wire name emitted when a
+// correction is appended to an encounter's signed SOAP note.
+const EncounterAddendumAppendedEventType = "encounter.addendum.appended"
+
+// EncounterAddendumAppendedEvent is emitted when an AppendAddendumCmd succeeds.
+// It records the author of the correction and its text; the signed note it
+// amends is left untouched, preserving its immutability.
+type EncounterAddendumAppendedEvent struct {
+	// EncounterID is the identity of the EncounterAggregate that produced the
+	// event.
+	EncounterID string
+	// AuthorID is the participant who authored the addendum.
+	AuthorID string
+	// AddendumText is the body of the appended correction.
+	AddendumText string
+}
+
+// Type identifies the event kind.
+func (e EncounterAddendumAppendedEvent) Type() string { return EncounterAddendumAppendedEventType }
+
+// AggregateID ties the event back to the encounter that produced it.
+func (e EncounterAddendumAppendedEvent) AggregateID() string { return e.EncounterID }
+
+// Compile-time assertion that EncounterAddendumAppendedEvent satisfies the
+// DomainEvent contract.
+var _ shared.DomainEvent = EncounterAddendumAppendedEvent{}
