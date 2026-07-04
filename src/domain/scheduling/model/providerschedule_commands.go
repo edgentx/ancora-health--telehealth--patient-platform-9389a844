@@ -18,3 +18,24 @@ type PublishAvailabilityCmd struct {
 	// provider's schedule. At least one window must be present.
 	Windows []string
 }
+
+// BlockTimeCmd requests that an interval on a provider's schedule be marked
+// unavailable so that no bookable slot may be offered within it.
+//
+// Blocking time is the inverse of publishing availability: it carves an interval
+// out of the provider's calendar for leave, an appointment held outside the
+// booking system, or any other reason the interval cannot be offered. The same
+// scheduling invariants gate the block — availability windows for the same
+// provider must not overlap, a blocked interval cannot be offered as a bookable
+// slot, and published availability must fall within the provider's clinic
+// operating hours. ProviderId identifies the provider whose schedule is being
+// blocked, Interval carries the span being marked unavailable, and Reason records
+// why; all three are mandatory.
+type BlockTimeCmd struct {
+	// ProviderId identifies the provider whose time is being blocked.
+	ProviderId string
+	// Interval is the span on the provider's schedule being marked unavailable.
+	Interval string
+	// Reason records why the interval is being blocked.
+	Reason string
+}

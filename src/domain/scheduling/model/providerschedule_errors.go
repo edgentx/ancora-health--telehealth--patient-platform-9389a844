@@ -11,6 +11,13 @@ var (
 	// availability windows.
 	ErrMissingWindows = errors.New("providerschedule: at least one availability window is required")
 
+	// ErrMissingInterval is returned when BlockTimeCmd omits the interval to block.
+	ErrMissingInterval = errors.New("providerschedule: interval is required")
+
+	// ErrMissingBlockReason is returned when BlockTimeCmd omits the reason for
+	// blocking the interval.
+	ErrMissingBlockReason = errors.New("providerschedule: block reason is required")
+
 	// ErrOverlappingWindows is returned when the published windows overlap one
 	// another. Invariant: availability windows for the same provider must not
 	// overlap.
