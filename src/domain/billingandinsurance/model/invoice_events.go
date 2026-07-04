@@ -30,3 +30,29 @@ func (e InvoiceGeneratedEvent) AggregateID() string { return e.InvoiceID }
 // Compile-time assertion that InvoiceGeneratedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = InvoiceGeneratedEvent{}
+
+// InvoiceAdjustedEventType is the stable wire name emitted when an invoice's
+// verified insurance coverage and copay are applied.
+const InvoiceAdjustedEventType = "invoice.adjusted"
+
+// InvoiceAdjustedEvent is emitted when an ApplyInsuranceAdjustmentCmd succeeds.
+// It records the verified insurance adjustment and copay applied to the invoice,
+// both in whole cents.
+type InvoiceAdjustedEvent struct {
+	// InvoiceID is the identity of the InvoiceAggregate that produced the event.
+	InvoiceID string
+	// CoverageCents is the verified insurance adjustment applied, in whole cents.
+	CoverageCents int64
+	// CopayCents is the patient copay applied, in whole cents.
+	CopayCents int64
+}
+
+// Type identifies the event kind.
+func (e InvoiceAdjustedEvent) Type() string { return InvoiceAdjustedEventType }
+
+// AggregateID ties the event back to the invoice that produced it.
+func (e InvoiceAdjustedEvent) AggregateID() string { return e.InvoiceID }
+
+// Compile-time assertion that InvoiceAdjustedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = InvoiceAdjustedEvent{}
