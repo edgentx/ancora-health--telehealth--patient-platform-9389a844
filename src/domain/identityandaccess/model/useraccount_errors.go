@@ -35,4 +35,8 @@ var (
 
 	// ErrMissingTenant is returned when RegisterUserCmd omits the tenant id.
 	ErrMissingTenant = errors.New("user account: tenant id is required")
+
+	// ErrEmailMismatch is returned when InitiatePasswordResetCmd targets an email
+	// that does not match the account it is executed against.
+	ErrEmailMismatch = errors.New("user account: email does not match this account")
 )

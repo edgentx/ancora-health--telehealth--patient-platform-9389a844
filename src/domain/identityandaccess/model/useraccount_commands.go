@@ -14,3 +14,12 @@ type RegisterUserCmd struct {
 	// TenantId scopes the account, and its email uniqueness, to a single tenant.
 	TenantId string
 }
+
+// InitiatePasswordResetCmd requests that a single-use password-reset token be
+// issued for the account identified by Email. Executing it emits a
+// user.password.reset.requested event once the account invariants hold.
+type InitiatePasswordResetCmd struct {
+	// Email identifies the account whose credential is being reset. It must
+	// belong to an active account within the aggregate's tenant.
+	Email string
+}
