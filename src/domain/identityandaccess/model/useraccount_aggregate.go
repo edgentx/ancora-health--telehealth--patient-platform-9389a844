@@ -48,6 +48,17 @@ type UserAccountAggregate struct {
 	// SecondFactorVerified reports whether a valid second factor has been
 	// presented for the current attempt.
 	SecondFactorVerified bool
+
+	// CredentialVerified reports whether the presented password matched the
+	// stored credential for the current attempt. Like SecondFactorVerified, it
+	// carries the *result* of verification performed by the auth infrastructure
+	// (which owns the slow-KDF hash and its constant-time comparison); the domain
+	// never holds or compares raw credential material. AuthenticateUserCmd reads
+	// this to decide between a successful authentication and a tracked failure.
+	CredentialVerified bool
+	// FailedLoginAttempts is the running count of failed login attempts, tracked
+	// by AuthenticateUserCmd toward the credential-stuffing lockout threshold.
+	FailedLoginAttempts int
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
@@ -58,6 +69,8 @@ func (a *UserAccountAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 		return a.registerUser(c)
 	case LockAccountCmd:
 		return a.lockAccount(c)
+	case AuthenticateUserCmd:
+		return a.authenticateUser(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -185,6 +198,94 @@ func (a *UserAccountAggregate) lockAccount(cmd LockAccountCmd) ([]shared.DomainE
 // drive both command handling and future replay when rehydrating from the store.
 func (a *UserAccountAggregate) applyLocked(evt UserAccountLockedEvent) {
 	a.LockedUntil = evt.LockedUntil
+}
+
+// authenticateUser handles AuthenticateUserCmd: it validates the presented
+// credentials, enforces the account invariants, then verifies the credential.
+// The invariant guards mirror registerUser so the strongest prohibitions (a
+// duplicate email or an active lockout) are reported before the credential and
+// MFA checks. A command that clears the invariants always executes successfully:
+// a matching credential emits UserAuthenticatedEvent, while a mismatch emits
+// UserLoginFailedEvent so the failed attempt is tracked toward the lockout
+// threshold rather than surfacing as a domain error.
+func (a *UserAccountAggregate) authenticateUser(cmd AuthenticateUserCmd) ([]shared.DomainEvent, error) {
+	if strings.TrimSpace(cmd.Email) == "" {
+		return nil, ErrMissingEmail
+	}
+	if strings.TrimSpace(cmd.Password) == "" {
+		return nil, ErrMissingPassword
+	}
+	if strings.TrimSpace(cmd.MfaCode) == "" {
+		return nil, ErrMissingMfaCode
+	}
+
+	// Invariant: email must be unique per tenant and cannot be reused by an
+	// active account.
+	if a.EmailRegistered {
+		return nil, ErrEmailAlreadyRegistered
+	}
+	// Invariant: an account locked by credential-stuffing protection cannot
+	// authenticate until the lockout window elapses.
+	if !a.LockedUntil.IsZero() && a.LockedUntil.After(time.Now()) {
+		return nil, ErrAccountLocked
+	}
+	// Invariant: a password reset token is single-use and must be unexpired to
+	// change the credential.
+	if a.ResetTokenConsumed ||
+		(!a.ResetTokenExpiresAt.IsZero() && !a.ResetTokenExpiresAt.After(time.Now())) {
+		return nil, ErrResetTokenInvalid
+	}
+	// Invariant: MFA-enrolled accounts must present a valid second factor before
+	// a session is issued.
+	if a.MFAEnrolled && !a.SecondFactorVerified {
+		return nil, ErrSecondFactorRequired
+	}
+
+	// A mismatched credential is not a domain error: it is a tracked failed
+	// attempt that feeds credential-stuffing protection. Verification itself is
+	// performed upstream by the auth infrastructure and surfaced as
+	// CredentialVerified, so no raw password is compared here.
+	if !a.CredentialVerified {
+		evt := UserLoginFailedEvent{
+			UserID:         a.ID,
+			Email:          cmd.Email,
+			FailedAttempts: a.FailedLoginAttempts + 1,
+		}
+
+		a.applyLoginFailed(evt)
+		a.AddEvent(evt)
+		a.Version++
+
+		return []shared.DomainEvent{evt}, nil
+	}
+
+	evt := UserAuthenticatedEvent{
+		UserID:   a.ID,
+		TenantID: a.TenantID,
+		Email:    cmd.Email,
+	}
+
+	a.applyAuthenticated(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyAuthenticated mutates aggregate state from a UserAuthenticatedEvent,
+// clearing the failed-attempt counter now that a login has succeeded. Keeping
+// mutation here lets the same event drive both command handling and future
+// replay when rehydrating from the store.
+func (a *UserAccountAggregate) applyAuthenticated(evt UserAuthenticatedEvent) {
+	a.FailedLoginAttempts = 0
+}
+
+// applyLoginFailed mutates aggregate state from a UserLoginFailedEvent, advancing
+// the failed-attempt counter that credential-stuffing protection reads. Keeping
+// mutation here lets the same event drive both command handling and future
+// replay when rehydrating from the store.
+func (a *UserAccountAggregate) applyLoginFailed(evt UserLoginFailedEvent) {
+	a.FailedLoginAttempts = evt.FailedAttempts
 }
 
 // routeForRole resolves the landing route an account is directed to based on its
