@@ -6,7 +6,6 @@ package model
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"strconv"
 	"strings"
 	"time"
 
@@ -173,11 +172,16 @@ func (a *UserAccountAggregate) initiatePasswordReset(cmd InitiatePasswordResetCm
 		return nil, ErrSecondFactorRequired
 	}
 
+	token, err := newResetToken()
+	if err != nil {
+		return nil, err
+	}
+
 	evt := PasswordResetRequestedEvent{
 		UserID:     a.ID,
 		TenantID:   a.TenantID,
 		Email:      cmd.Email,
-		ResetToken: newResetToken(),
+		ResetToken: token,
 		ExpiresAt:  time.Now().Add(resetTokenTTL),
 	}
 
@@ -197,15 +201,16 @@ func (a *UserAccountAggregate) applyPasswordResetRequested(evt PasswordResetRequ
 	a.ResetTokenConsumed = false
 }
 
-// newResetToken produces an opaque, single-use password-reset token. It reads
-// from a cryptographically secure source; on the rare read failure it falls
-// back to a timestamp-derived token so a reset can still be issued.
-func newResetToken() string {
+// newResetToken produces an opaque, single-use password-reset token from a
+// cryptographically secure source. It fails closed: if the CSPRNG cannot be
+// read it returns an error rather than a predictable fallback, so the reset
+// command aborts without emitting an event or issuing a guessable token.
+func newResetToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		return "reset-" + strconv.FormatInt(time.Now().UnixNano(), 16)
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 // routeForRole resolves the landing route an account is directed to based on its
