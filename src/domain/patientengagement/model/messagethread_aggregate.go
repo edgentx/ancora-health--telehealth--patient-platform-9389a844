@@ -61,6 +61,10 @@ type MessageThreadAggregate struct {
 	// do not share an active care relationship. Invariant: a thread cannot be
 	// created without an active care relationship between participants.
 	NoActiveCareRelationship bool
+
+	// PostedMessageCount is the number of secure messages that have been posted to
+	// the thread. It grows as PostSecureMessageCmd succeeds.
+	PostedMessageCount int
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
@@ -69,6 +73,8 @@ func (a *MessageThreadAggregate) Execute(cmd interface{}) ([]shared.DomainEvent,
 	switch c := cmd.(type) {
 	case StartMessageThreadCmd:
 		return a.startMessageThread(c)
+	case PostSecureMessageCmd:
+		return a.postSecureMessage(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -137,4 +143,64 @@ func (a *MessageThreadAggregate) apply(evt MessageThreadStartedEvent) {
 	a.ScopedPatientID = evt.PatientID
 	a.ScopedCareTeamMemberIDs = evt.CareTeamMemberIDs
 	a.Subject = evt.Subject
+}
+
+// postSecureMessage handles PostSecureMessageCmd: it validates the command input,
+// enforces the message-thread invariants, then emits a MessageSecurePostedEvent
+// and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: thread, author and body must all be present.
+//   - Participant access: only the patient and care-team participants may post to
+//     or read the thread, so access must be confined to that set.
+//   - Encryption: the message content must be PHI-encrypted at rest.
+//   - Care relationship: a thread only exists where its participants share an
+//     active care relationship, so a message may not be posted without one.
+func (a *MessageThreadAggregate) postSecureMessage(cmd PostSecureMessageCmd) ([]shared.DomainEvent, error) {
+	if cmd.ThreadId == "" {
+		return nil, ErrMissingThread
+	}
+	if cmd.AuthorId == "" {
+		return nil, ErrMissingAuthor
+	}
+	if cmd.Body == "" {
+		return nil, ErrMissingBody
+	}
+
+	// Invariant: only the patient and care-team participants may post to or read
+	// the thread.
+	if a.AccessNotRestricted {
+		return nil, ErrParticipantAccessNotRestricted
+	}
+
+	// Invariant: message content must be PHI-encrypted at rest.
+	if a.ContentNotEncrypted {
+		return nil, ErrContentNotEncrypted
+	}
+
+	// Invariant: a thread cannot exist without an active care relationship between
+	// the participants, so a message may not be posted without one.
+	if a.NoActiveCareRelationship {
+		return nil, ErrNoActiveCareRelationship
+	}
+
+	evt := MessageSecurePostedEvent{
+		ThreadID: a.ID,
+		AuthorID: cmd.AuthorId,
+		Body:     cmd.Body,
+	}
+
+	a.applyPosted(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyPosted mutates aggregate state from a MessageSecurePostedEvent. Like
+// apply, it is the single place posted-message state changes, so it serves both
+// command handling and future event replay when rehydrating from the store.
+func (a *MessageThreadAggregate) applyPosted(evt MessageSecurePostedEvent) {
+	a.PostedMessageCount++
 }

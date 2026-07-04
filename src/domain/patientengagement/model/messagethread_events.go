@@ -31,3 +31,31 @@ func (e MessageThreadStartedEvent) AggregateID() string { return e.ThreadID }
 // Compile-time assertion that MessageThreadStartedEvent satisfies the
 // DomainEvent contract.
 var _ shared.DomainEvent = MessageThreadStartedEvent{}
+
+// MessageSecurePostedEventType is the stable wire name emitted when an encrypted
+// message is posted to a secure thread.
+const MessageSecurePostedEventType = "message.secure.posted"
+
+// MessageSecurePostedEvent is emitted when a PostSecureMessageCmd succeeds. It
+// records the thread the message was posted to, the participant who authored it,
+// and the message body. The body it carries is PHI-encrypted content, posted by
+// a participant the thread's access is scoped to.
+type MessageSecurePostedEvent struct {
+	// ThreadID is the identity of the MessageThreadAggregate that produced the
+	// event.
+	ThreadID string
+	// AuthorID is the participant who posted the message.
+	AuthorID string
+	// Body is the posted message content.
+	Body string
+}
+
+// Type identifies the event kind.
+func (e MessageSecurePostedEvent) Type() string { return MessageSecurePostedEventType }
+
+// AggregateID ties the event back to the thread that produced it.
+func (e MessageSecurePostedEvent) AggregateID() string { return e.ThreadID }
+
+// Compile-time assertion that MessageSecurePostedEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = MessageSecurePostedEvent{}
