@@ -73,6 +73,8 @@ func (a *AppointmentAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 	switch c := cmd.(type) {
 	case HoldSlotCmd:
 		return a.holdSlot(c)
+	case RescheduleAppointmentCmd:
+		return a.rescheduleAppointment(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -142,6 +144,67 @@ func (a *AppointmentAggregate) holdSlot(cmd HoldSlotCmd) ([]shared.DomainEvent, 
 	return []shared.DomainEvent{evt}, nil
 }
 
+// rescheduleAppointment handles RescheduleAppointmentCmd: it validates the
+// command input, enforces the scheduling invariants against the new slot, then
+// emits an AppointmentRescheduledEvent and buffers it on the aggregate. Moving an
+// appointment re-acquires the slot reservation at the new time, so the same
+// guards that gate an initial hold gate the move.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the appointment id and the new time slot must both be present.
+//   - Provider availability: the new slot must fall within the provider's
+//     published availability.
+//   - Double-booking: a slot may be occupied by at most one appointment at a time.
+//   - Hold-lock expiry: a slot whose prior hold lock expired without confirmation
+//     must have been released before the appointment can move onto it.
+//   - Policy window: reschedule activity is only permitted within the configured
+//     policy window.
+func (a *AppointmentAggregate) rescheduleAppointment(cmd RescheduleAppointmentCmd) ([]shared.DomainEvent, error) {
+	if cmd.AppointmentId == "" {
+		return nil, ErrMissingAppointment
+	}
+	if cmd.NewTimeSlot == "" {
+		return nil, ErrMissingNewTimeSlot
+	}
+
+	// Invariant: an appointment cannot be booked outside the provider's published
+	// availability.
+	if a.SlotOutsideAvailability {
+		return nil, ErrSlotOutsideAvailability
+	}
+
+	// Invariant: a slot may be booked by at most one appointment at a time — the
+	// destination slot must not already be claimed by another appointment.
+	if a.SlotAlreadyBooked {
+		return nil, ErrSlotDoubleBooked
+	}
+
+	// Invariant: a held slot must be confirmed before its hold lock expires or it
+	// is released; an expired-but-unreleased lock blocks the move.
+	if a.HoldLockExpired {
+		return nil, ErrHoldLockExpired
+	}
+
+	// Invariant: reschedule and cancel are only permitted within the configured
+	// policy window.
+	if a.OutsidePolicyWindow {
+		return nil, ErrOutsidePolicyWindow
+	}
+
+	evt := AppointmentRescheduledEvent{
+		AppointmentID:    a.ID,
+		PreviousTimeSlot: a.HeldTimeSlot,
+		NewTimeSlot:      cmd.NewTimeSlot,
+	}
+
+	a.applyRescheduled(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -150,4 +213,13 @@ func (a *AppointmentAggregate) apply(evt AppointmentSlotHeldEvent) {
 	a.ScopedProviderID = evt.ProviderID
 	a.ScopedPatientID = evt.PatientID
 	a.HeldTimeSlot = evt.TimeSlot
+}
+
+// applyRescheduled mutates aggregate state from an AppointmentRescheduledEvent.
+// It re-points the appointment at the new slot while keeping it in the held
+// state, mirroring apply as the single mutation point for the reschedule event
+// during both command handling and replay.
+func (a *AppointmentAggregate) applyRescheduled(evt AppointmentRescheduledEvent) {
+	a.Status = AppointmentStatusHeld
+	a.HeldTimeSlot = evt.NewTimeSlot
 }

@@ -31,3 +31,32 @@ func (e AppointmentSlotHeldEvent) AggregateID() string { return e.AppointmentID 
 // Compile-time assertion that AppointmentSlotHeldEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = AppointmentSlotHeldEvent{}
+
+// AppointmentRescheduledEventType is the stable wire name emitted when an
+// appointment is moved to a new time slot within policy.
+const AppointmentRescheduledEventType = "appointment.rescheduled"
+
+// AppointmentRescheduledEvent is emitted when a RescheduleAppointmentCmd
+// succeeds. It records the appointment that was moved, the slot it previously
+// held, and the new slot it now holds. Its emission re-points the appointment at
+// the new slot while leaving it in the held state that must still be confirmed
+// before its hold lock expires or it is released.
+type AppointmentRescheduledEvent struct {
+	// AppointmentID is the identity of the AppointmentAggregate that produced the
+	// event.
+	AppointmentID string
+	// PreviousTimeSlot is the slot the appointment held before the reschedule.
+	PreviousTimeSlot string
+	// NewTimeSlot is the slot the appointment was moved to.
+	NewTimeSlot string
+}
+
+// Type identifies the event kind.
+func (e AppointmentRescheduledEvent) Type() string { return AppointmentRescheduledEventType }
+
+// AggregateID ties the event back to the appointment that produced it.
+func (e AppointmentRescheduledEvent) AggregateID() string { return e.AppointmentID }
+
+// Compile-time assertion that AppointmentRescheduledEvent satisfies the
+// DomainEvent contract.
+var _ shared.DomainEvent = AppointmentRescheduledEvent{}

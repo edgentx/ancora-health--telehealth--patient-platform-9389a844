@@ -12,6 +12,14 @@ var (
 	// ErrMissingPatient is returned when HoldSlotCmd omits the patient id.
 	ErrMissingPatient = errors.New("appointment: patient id is required")
 
+	// ErrMissingAppointment is returned when RescheduleAppointmentCmd omits the
+	// appointment id.
+	ErrMissingAppointment = errors.New("appointment: appointment id is required")
+
+	// ErrMissingNewTimeSlot is returned when RescheduleAppointmentCmd omits the
+	// new time slot.
+	ErrMissingNewTimeSlot = errors.New("appointment: new time slot is required")
+
 	// ErrSlotOutsideAvailability is returned when the requested slot falls outside
 	// the provider's published availability. Invariant: an appointment cannot be
 	// booked outside the provider's published availability.

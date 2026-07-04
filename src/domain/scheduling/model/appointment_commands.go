@@ -20,3 +20,22 @@ type HoldSlotCmd struct {
 	// PatientId identifies the patient the slot is being reserved for.
 	PatientId string
 }
+
+// RescheduleAppointmentCmd requests that an existing appointment be moved to a
+// new time slot within policy.
+//
+// Rescheduling re-points a held appointment at a different slot: the same
+// scheduling invariants that gate the original hold gate the move — the new slot
+// must fall within the provider's published availability, at most one appointment
+// may occupy a given slot at a time (no double-booking), a slot whose prior hold
+// lock has expired without confirmation must have been released first, and
+// reschedule activity is only permitted within the configured policy window.
+// AppointmentId identifies the appointment being moved and NewTimeSlot the slot
+// it is moving to; both are mandatory.
+type RescheduleAppointmentCmd struct {
+	// AppointmentId identifies the appointment being rescheduled.
+	AppointmentId string
+	// NewTimeSlot identifies the slot on the provider's schedule the appointment
+	// is being moved to.
+	NewTimeSlot string
+}
