@@ -38,3 +38,21 @@ type ManageSpecialtyCmd struct {
 	// DisplayName is the human-readable name shown for the specialty.
 	DisplayName string
 }
+
+// ConfigureClinicCmd creates or updates a clinic entry in the clinic directory,
+// capturing the clinic identity that names the entry and the operating hours it
+// is available for booking.
+//
+// Configuring a clinic is an upsert: an identity that is not yet in the
+// directory is created, and one that already exists has its operating hours
+// updated. The same directory invariants apply as for the other directory
+// commands: a provider must be assigned to at least one clinic to be bookable, a
+// specialty code must be unique within the directory, and a clinic cannot be
+// deactivated while it has future booked appointments. Both ClinicIdentity and
+// OperatingHours are mandatory.
+type ConfigureClinicCmd struct {
+	// ClinicIdentity identifies the clinic entry being created or updated.
+	ClinicIdentity string
+	// OperatingHours are the hours the clinic is available for booking.
+	OperatingHours string
+}

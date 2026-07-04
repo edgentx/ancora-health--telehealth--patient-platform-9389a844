@@ -23,6 +23,14 @@ var (
 	// name.
 	ErrMissingDisplayName = errors.New("clinicdirectory: specialty display name is required")
 
+	// ErrMissingClinicIdentity is returned when ConfigureClinicCmd omits the
+	// clinic identity.
+	ErrMissingClinicIdentity = errors.New("clinicdirectory: clinic identity is required")
+
+	// ErrMissingOperatingHours is returned when ConfigureClinicCmd omits the
+	// operating hours.
+	ErrMissingOperatingHours = errors.New("clinicdirectory: clinic operating hours are required")
+
 	// ErrProviderNotBookable is returned when registering a provider that is not
 	// assigned to any clinic. Invariant: a provider must be assigned to at least
 	// one clinic to be bookable.

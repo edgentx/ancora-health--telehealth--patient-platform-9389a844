@@ -57,3 +57,30 @@ func (e SpecialtyUpdatedEvent) AggregateID() string { return e.DirectoryID }
 // Compile-time assertion that SpecialtyUpdatedEvent satisfies the DomainEvent
 // contract.
 var _ shared.DomainEvent = SpecialtyUpdatedEvent{}
+
+// ClinicConfiguredEventType is the stable wire name emitted when a clinic entry
+// is created or updated in the clinic directory.
+const ClinicConfiguredEventType = "clinic.configured"
+
+// ClinicConfiguredEvent is emitted when a ConfigureClinicCmd succeeds. It records
+// the clinic identity that was created or updated and the operating hours it now
+// carries.
+type ClinicConfiguredEvent struct {
+	// DirectoryID is the identity of the ClinicDirectoryAggregate that produced
+	// the event.
+	DirectoryID string
+	// ClinicIdentity is the clinic entry that was created or updated.
+	ClinicIdentity string
+	// OperatingHours are the operating hours the clinic now carries.
+	OperatingHours string
+}
+
+// Type identifies the event kind.
+func (e ClinicConfiguredEvent) Type() string { return ClinicConfiguredEventType }
+
+// AggregateID ties the event back to the directory that produced it.
+func (e ClinicConfiguredEvent) AggregateID() string { return e.DirectoryID }
+
+// Compile-time assertion that ClinicConfiguredEvent satisfies the DomainEvent
+// contract.
+var _ shared.DomainEvent = ClinicConfiguredEvent{}
