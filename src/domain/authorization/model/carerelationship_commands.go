@@ -39,3 +39,23 @@ type RevokeCareRelationshipCmd struct {
 	// Reason records why the care relationship is being ended.
 	Reason string
 }
+
+// AssignScopedRoleCmd requests that a role be granted to an account, bounded to
+// a clinic scope, on an established care relationship. Scoping the role to a
+// clinic keeps the grant least-privileged: the account holds the role only
+// within that clinic, not across the whole platform.
+//
+// The command runs against the same care-relationship invariants that govern
+// access: a provider may only access a patient's PHI when an active care
+// relationship exists, a care relationship must be revoked when the care episode
+// ends, and a relationship cannot be self-asserted by the accessing party
+// without a governing grant. AccountID, Role, and ClinicID scope the assignment
+// and are all mandatory.
+type AssignScopedRoleCmd struct {
+	// AccountID identifies the account being granted the role.
+	AccountID string
+	// Role is the role being granted to the account within the clinic scope.
+	Role string
+	// ClinicID identifies the clinic the role assignment is bounded to.
+	ClinicID string
+}

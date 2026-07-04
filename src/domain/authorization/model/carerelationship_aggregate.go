@@ -67,6 +67,14 @@ type CareRelationshipAggregate struct {
 	// party without a governing grant. Invariant: a relationship cannot be
 	// self-asserted by the accessing party without a governing grant.
 	SelfAsserted bool
+
+	// ScopedRoleAccountID, ScopedRole and ScopedRoleClinicID record the most
+	// recent clinic-scoped role assignment. They are empty until a role is
+	// assigned via AssignScopedRoleCmd, at which point they capture the account,
+	// role and clinic the grant is bounded to.
+	ScopedRoleAccountID string
+	ScopedRole          string
+	ScopedRoleClinicID  string
 }
 
 // Execute applies a command to the aggregate and returns the domain events it
@@ -77,6 +85,8 @@ func (a *CareRelationshipAggregate) Execute(cmd interface{}) ([]shared.DomainEve
 		return a.establishCareRelationship(c)
 	case RevokeCareRelationshipCmd:
 		return a.revokeCareRelationship(c)
+	case AssignScopedRoleCmd:
+		return a.assignScopedRole(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -205,4 +215,69 @@ func (a *CareRelationshipAggregate) apply(evt CareRelationshipEstablishedEvent) 
 // future event replay when rehydrating the aggregate from the store.
 func (a *CareRelationshipAggregate) applyRevoked(evt CareRelationshipRevokedEvent) {
 	a.Status = RelationshipStatusRevoked
+}
+
+// assignScopedRole handles AssignScopedRoleCmd: it validates the command input,
+// enforces the care-relationship invariants, then emits a RoleAssignedEvent and
+// buffers it on the aggregate. The role is bounded to the supplied clinic so the
+// account holds it only within that clinic's scope, not platform-wide.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the account, role, and clinic must all be present.
+//   - Active relationship: a provider may only access a patient's PHI when an
+//     active care relationship exists.
+//   - Episode revocation: a care relationship must be revoked when the care
+//     episode ends.
+//   - Governing grant: a relationship cannot be self-asserted by the accessing
+//     party without a governing grant.
+func (a *CareRelationshipAggregate) assignScopedRole(cmd AssignScopedRoleCmd) ([]shared.DomainEvent, error) {
+	if cmd.AccountID == "" {
+		return nil, ErrMissingAccountID
+	}
+	if cmd.Role == "" {
+		return nil, ErrMissingRole
+	}
+	if cmd.ClinicID == "" {
+		return nil, ErrMissingClinicID
+	}
+
+	// Invariant: a provider may only access a patient's PHI when an active care
+	// relationship exists.
+	if a.Status != RelationshipStatusActive || a.Inactive {
+		return nil, ErrNoActiveRelationship
+	}
+
+	// Invariant: a care relationship must be revoked when the care episode ends.
+	if a.EpisodeEnded {
+		return nil, ErrCareEpisodeEnded
+	}
+
+	// Invariant: a relationship cannot be self-asserted by the accessing party
+	// without a governing grant.
+	if a.SelfAsserted {
+		return nil, ErrSelfAssertedRelationship
+	}
+
+	evt := RoleAssignedEvent{
+		RelationshipID: a.ID,
+		AccountID:      cmd.AccountID,
+		Role:           cmd.Role,
+		ClinicID:       cmd.ClinicID,
+	}
+
+	a.applyRoleAssigned(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyRoleAssigned mutates aggregate state from a RoleAssignedEvent. Like
+// apply, it is the single place this event changes state, so it serves both
+// command handling and future event replay when rehydrating from the store.
+func (a *CareRelationshipAggregate) applyRoleAssigned(evt RoleAssignedEvent) {
+	a.ScopedRoleAccountID = evt.AccountID
+	a.ScopedRole = evt.Role
+	a.ScopedRoleClinicID = evt.ClinicID
 }
