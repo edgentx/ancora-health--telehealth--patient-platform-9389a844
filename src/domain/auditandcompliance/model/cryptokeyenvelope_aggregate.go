@@ -38,6 +38,8 @@ func (a *CryptoKeyEnvelopeAggregate) Execute(cmd interface{}) ([]shared.DomainEv
 	switch c := cmd.(type) {
 	case IssueDataKeyCmd:
 		return a.issueDataKey(c)
+	case RotateMasterKeyCmd:
+		return a.rotateMasterKey(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -72,6 +74,38 @@ func (a *CryptoKeyEnvelopeAggregate) issueDataKey(cmd IssueDataKeyCmd) ([]shared
 		EnvelopeID: a.ID,
 		TenantID:   cmd.TenantId,
 		FieldClass: cmd.FieldClass,
+	}
+	a.AddEvent(event)
+	return []shared.DomainEvent{event}, nil
+}
+
+// rotateMasterKey handles RotateMasterKeyCmd: it validates the command input,
+// enforces the envelope invariants, then emits a MasterKeyRotatedEvent and
+// buffers it on the aggregate. Rewrapping active data keys is only legitimate on
+// an envelope that may still produce PHI ciphertext, so the same guards that
+// gate key issuance apply here — ordered revocation (strongest prohibition)
+// before expiry, and both before the master-key check.
+func (a *CryptoKeyEnvelopeAggregate) rotateMasterKey(cmd RotateMasterKeyCmd) ([]shared.DomainEvent, error) {
+	if cmd.NewMasterKeyId == "" {
+		return nil, ErrMissingMasterKeyId
+	}
+
+	// Invariant: a revoked key envelope can never be used to encrypt new PHI.
+	if a.Revoked {
+		return nil, ErrEnvelopeRevoked
+	}
+	// Invariant: PHI ciphertext may only be produced with a non-expired envelope.
+	if !a.ExpiresAt.IsZero() && !a.ExpiresAt.After(time.Now()) {
+		return nil, ErrEnvelopeExpired
+	}
+	// Invariant: a data key must be wrapped by an active master key.
+	if !a.MasterKeyActive {
+		return nil, ErrMasterKeyInactive
+	}
+
+	event := MasterKeyRotatedEvent{
+		EnvelopeID:     a.ID,
+		NewMasterKeyID: cmd.NewMasterKeyId,
 	}
 	a.AddEvent(event)
 	return []shared.DomainEvent{event}, nil

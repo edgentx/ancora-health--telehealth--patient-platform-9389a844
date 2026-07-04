@@ -10,3 +10,12 @@ type IssueDataKeyCmd struct {
 	// "diagnosis") the data key will encrypt.
 	FieldClass string
 }
+
+// RotateMasterKeyCmd requests that the CryptoKeyEnvelope rewrap its active data
+// encryption keys under a new master (wrapping) key. It carries the identity of
+// the new master key that will back the envelope after rotation.
+type RotateMasterKeyCmd struct {
+	// NewMasterKeyId identifies the master key the envelope's data keys are
+	// rewrapped under. It must be non-empty.
+	NewMasterKeyId string
+}
