@@ -55,3 +55,22 @@ type CompleteEncounterCmd struct {
 	// the provider the encounter is scoped to.
 	ProviderId string
 }
+
+// AppendAddendumCmd requests that a correction be appended to an encounter's
+// signed SOAP note.
+//
+// Appending is the sanctioned way to correct an immutable signed note: rather
+// than editing the sealed note, an author records a follow-up addendum. AuthorId
+// names the author of the correction, who must be the participant the encounter
+// is scoped to — only scoped participants may view or act on the in-call note —
+// and every diagnosis already recorded on the encounter must reference a coded
+// terminology entry (e.g., an ICD-10 code).
+type AppendAddendumCmd struct {
+	// EncounterId is the identity of the encounter whose note is being amended.
+	EncounterId string
+	// AddendumText is the body of the correction being appended to the note.
+	AddendumText string
+	// AuthorId identifies the author of the addendum; it must match the provider
+	// the encounter is scoped to.
+	AuthorId string
+}
