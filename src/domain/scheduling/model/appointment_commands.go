@@ -39,3 +39,25 @@ type RescheduleAppointmentCmd struct {
 	// is being moved to.
 	NewTimeSlot string
 }
+
+// RegisterWalkInCmd requests that an unscheduled patient who presents at the
+// front desk be registered as an appointment with a provider at a clinic.
+//
+// A walk-in is the front-desk registration of a patient who arrives without a
+// prior booking: the patient is assigned to a provider at the clinic on the
+// spot. Because registration still books the patient onto the provider, the same
+// scheduling invariants that gate a hold gate the walk-in — the slot must fall
+// within the provider's published availability, at most one appointment may
+// occupy a given slot at a time (no double-booking), a slot whose prior hold lock
+// has expired without confirmation must have been released first, and the action
+// is only permitted within the configured policy window. PatientId, ClinicId and
+// ProviderId identify the patient, the clinic they present at and the provider
+// they are registered with; all three are mandatory.
+type RegisterWalkInCmd struct {
+	// PatientId identifies the walk-in patient being registered.
+	PatientId string
+	// ClinicId identifies the clinic the patient presents at.
+	ClinicId string
+	// ProviderId identifies the provider the walk-in is registered with.
+	ProviderId string
+}

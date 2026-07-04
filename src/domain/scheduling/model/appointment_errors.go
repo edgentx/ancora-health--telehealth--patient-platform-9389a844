@@ -12,6 +12,9 @@ var (
 	// ErrMissingPatient is returned when HoldSlotCmd omits the patient id.
 	ErrMissingPatient = errors.New("appointment: patient id is required")
 
+	// ErrMissingClinic is returned when RegisterWalkInCmd omits the clinic id.
+	ErrMissingClinic = errors.New("appointment: clinic id is required")
+
 	// ErrMissingAppointment is returned when RescheduleAppointmentCmd omits the
 	// appointment id.
 	ErrMissingAppointment = errors.New("appointment: appointment id is required")
