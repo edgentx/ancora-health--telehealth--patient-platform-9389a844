@@ -25,6 +25,11 @@ type ClinicDirectoryAggregate struct {
 	// ProviderIDs are the providers already registered in the directory.
 	ProviderIDs []string
 
+	// SpecialtyCodes are the specialty codes already present in the directory.
+	// ManageSpecialtyCmd appends a newly created code here; updating an existing
+	// entry leaves the set unchanged.
+	SpecialtyCodes []string
+
 	// ProviderNotBookable reports that the provider being registered is not
 	// assigned to any clinic. Invariant: a provider must be assigned to at least
 	// one clinic to be bookable.
@@ -47,6 +52,8 @@ func (a *ClinicDirectoryAggregate) Execute(cmd interface{}) ([]shared.DomainEven
 	switch c := cmd.(type) {
 	case RegisterProviderCmd:
 		return a.registerProvider(c)
+	case ManageSpecialtyCmd:
+		return a.manageSpecialty(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -107,9 +114,76 @@ func (a *ClinicDirectoryAggregate) registerProvider(cmd RegisterProviderCmd) ([]
 	return []shared.DomainEvent{evt}, nil
 }
 
+// manageSpecialty handles ManageSpecialtyCmd: it validates the command input,
+// enforces the directory invariants, then emits a SpecialtyUpdatedEvent and
+// buffers it on the aggregate.
+//
+// The command is an upsert — a code not yet in the directory is created and one
+// already present has its display name updated — so a single specialty.updated
+// event covers both paths.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the specialty code and display name must both be present.
+//   - Bookable: a provider must be assigned to at least one clinic to be
+//     bookable.
+//   - Unique specialty: a specialty code must be unique within the directory.
+//   - Clinic deactivation: a clinic cannot be deactivated while it has future
+//     booked appointments.
+func (a *ClinicDirectoryAggregate) manageSpecialty(cmd ManageSpecialtyCmd) ([]shared.DomainEvent, error) {
+	if cmd.SpecialtyCode == "" {
+		return nil, ErrMissingSpecialtyCode
+	}
+	if cmd.DisplayName == "" {
+		return nil, ErrMissingDisplayName
+	}
+
+	// Invariant: a provider must be assigned to at least one clinic to be
+	// bookable.
+	if a.ProviderNotBookable {
+		return nil, ErrProviderNotBookable
+	}
+
+	// Invariant: a specialty code must be unique within the directory.
+	if a.DuplicateSpecialtyCode {
+		return nil, ErrDuplicateSpecialtyCode
+	}
+
+	// Invariant: a clinic cannot be deactivated while it has future booked
+	// appointments.
+	if a.ClinicDeactivationBlocked {
+		return nil, ErrClinicDeactivationBlocked
+	}
+
+	evt := SpecialtyUpdatedEvent{
+		DirectoryID:   a.ID,
+		SpecialtyCode: cmd.SpecialtyCode,
+		DisplayName:   cmd.DisplayName,
+	}
+
+	a.applySpecialtyUpdated(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
 func (a *ClinicDirectoryAggregate) apply(evt ProviderRegisteredEvent) {
 	a.ProviderIDs = append(a.ProviderIDs, evt.ProviderID)
+}
+
+// applySpecialtyUpdated mutates aggregate state from a SpecialtyUpdatedEvent.
+// Because the command is an upsert, a code already present is left in place
+// (the update only changes its display name, which the aggregate does not
+// index) and only a newly created code is appended to the registry.
+func (a *ClinicDirectoryAggregate) applySpecialtyUpdated(evt SpecialtyUpdatedEvent) {
+	for _, code := range a.SpecialtyCodes {
+		if code == evt.SpecialtyCode {
+			return
+		}
+	}
+	a.SpecialtyCodes = append(a.SpecialtyCodes, evt.SpecialtyCode)
 }

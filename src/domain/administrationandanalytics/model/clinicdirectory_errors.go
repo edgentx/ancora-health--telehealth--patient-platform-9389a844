@@ -15,6 +15,14 @@ var (
 	// ids.
 	ErrMissingClinics = errors.New("clinicdirectory: at least one clinic is required")
 
+	// ErrMissingSpecialtyCode is returned when ManageSpecialtyCmd omits the
+	// specialty code.
+	ErrMissingSpecialtyCode = errors.New("clinicdirectory: specialty code is required")
+
+	// ErrMissingDisplayName is returned when ManageSpecialtyCmd omits the display
+	// name.
+	ErrMissingDisplayName = errors.New("clinicdirectory: specialty display name is required")
+
 	// ErrProviderNotBookable is returned when registering a provider that is not
 	// assigned to any clinic. Invariant: a provider must be assigned to at least
 	// one clinic to be bookable.
