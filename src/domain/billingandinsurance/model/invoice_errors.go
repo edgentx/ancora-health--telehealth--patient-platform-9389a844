@@ -46,4 +46,7 @@ var (
 	// ErrNegativeAdjustment is returned when ApplyInsuranceAdjustmentCmd is given
 	// a negative coverage or copay amount.
 	ErrNegativeAdjustment = errors.New("invoice: coverage and copay may not be negative")
+
+	// ErrMissingVoidReason is returned when VoidInvoiceCmd omits the void reason.
+	ErrMissingVoidReason = errors.New("invoice: void reason is required")
 )
