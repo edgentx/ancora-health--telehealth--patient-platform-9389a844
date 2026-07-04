@@ -49,9 +49,13 @@ type UserAccountAggregate struct {
 	// presented for the current attempt.
 	SecondFactorVerified bool
 
-	// Credential is the account's stored login credential. AuthenticateUserCmd
-	// compares the presented password against it to decide success or failure.
-	Credential string
+	// CredentialVerified reports whether the presented password matched the
+	// stored credential for the current attempt. Like SecondFactorVerified, it
+	// carries the *result* of verification performed by the auth infrastructure
+	// (which owns the slow-KDF hash and its constant-time comparison); the domain
+	// never holds or compares raw credential material. AuthenticateUserCmd reads
+	// this to decide between a successful authentication and a tracked failure.
+	CredentialVerified bool
 	// FailedLoginAttempts is the running count of failed login attempts, tracked
 	// by AuthenticateUserCmd toward the credential-stuffing lockout threshold.
 	FailedLoginAttempts int
@@ -238,8 +242,10 @@ func (a *UserAccountAggregate) authenticateUser(cmd AuthenticateUserCmd) ([]shar
 	}
 
 	// A mismatched credential is not a domain error: it is a tracked failed
-	// attempt that feeds credential-stuffing protection.
-	if cmd.Password != a.Credential {
+	// attempt that feeds credential-stuffing protection. Verification itself is
+	// performed upstream by the auth infrastructure and surfaced as
+	// CredentialVerified, so no raw password is compared here.
+	if !a.CredentialVerified {
 		evt := UserLoginFailedEvent{
 			UserID:         a.ID,
 			Email:          cmd.Email,
