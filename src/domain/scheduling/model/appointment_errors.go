@@ -20,6 +20,10 @@ var (
 	// new time slot.
 	ErrMissingNewTimeSlot = errors.New("appointment: new time slot is required")
 
+	// ErrMissingReason is returned when CancelAppointmentCmd omits the
+	// cancellation reason.
+	ErrMissingReason = errors.New("appointment: cancellation reason is required")
+
 	// ErrSlotOutsideAvailability is returned when the requested slot falls outside
 	// the provider's published availability. Invariant: an appointment cannot be
 	// booked outside the provider's published availability.

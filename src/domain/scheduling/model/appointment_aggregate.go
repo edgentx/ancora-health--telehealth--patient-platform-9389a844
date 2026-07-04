@@ -15,6 +15,9 @@ const (
 	// AppointmentStatusHeld is an appointment holding a hold lock over a slot that
 	// must be confirmed before the lock expires or it is released.
 	AppointmentStatusHeld AppointmentStatus = "held"
+	// AppointmentStatusCancelled is an appointment that has been cancelled and has
+	// released the slot it held.
+	AppointmentStatusCancelled AppointmentStatus = "cancelled"
 )
 
 // AppointmentAggregate is the scheduling Appointment aggregate. It embeds
@@ -75,6 +78,8 @@ func (a *AppointmentAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 		return a.holdSlot(c)
 	case RescheduleAppointmentCmd:
 		return a.rescheduleAppointment(c)
+	case CancelAppointmentCmd:
+		return a.cancelAppointment(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -205,6 +210,68 @@ func (a *AppointmentAggregate) rescheduleAppointment(cmd RescheduleAppointmentCm
 	return []shared.DomainEvent{evt}, nil
 }
 
+// cancelAppointment handles CancelAppointmentCmd: it validates the command
+// input, enforces the scheduling invariants, then emits an
+// AppointmentCancelledEvent and buffers it on the aggregate. Cancelling releases
+// the slot the appointment held so other appointments may claim it, and applies
+// whatever policy penalties the cancellation incurs.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the appointment id and a cancellation reason must both be
+//     present.
+//   - Provider availability: the slot must fall within the provider's published
+//     availability.
+//   - Double-booking: a slot may be occupied by at most one appointment at a time.
+//   - Hold-lock expiry: a slot whose prior hold lock expired without confirmation
+//     must have been released.
+//   - Policy window: cancel activity is only permitted within the configured
+//     policy window.
+func (a *AppointmentAggregate) cancelAppointment(cmd CancelAppointmentCmd) ([]shared.DomainEvent, error) {
+	if cmd.AppointmentId == "" {
+		return nil, ErrMissingAppointment
+	}
+	if cmd.Reason == "" {
+		return nil, ErrMissingReason
+	}
+
+	// Invariant: an appointment cannot be booked outside the provider's published
+	// availability.
+	if a.SlotOutsideAvailability {
+		return nil, ErrSlotOutsideAvailability
+	}
+
+	// Invariant: a slot may be booked by at most one appointment at a time (no
+	// double-booking).
+	if a.SlotAlreadyBooked {
+		return nil, ErrSlotDoubleBooked
+	}
+
+	// Invariant: a held slot must be confirmed before its hold lock expires or it
+	// is released.
+	if a.HoldLockExpired {
+		return nil, ErrHoldLockExpired
+	}
+
+	// Invariant: reschedule and cancel are only permitted within the configured
+	// policy window.
+	if a.OutsidePolicyWindow {
+		return nil, ErrOutsidePolicyWindow
+	}
+
+	evt := AppointmentCancelledEvent{
+		AppointmentID:    a.ID,
+		ReleasedTimeSlot: a.HeldTimeSlot,
+		Reason:           cmd.Reason,
+	}
+
+	a.applyCancelled(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -222,4 +289,13 @@ func (a *AppointmentAggregate) apply(evt AppointmentSlotHeldEvent) {
 func (a *AppointmentAggregate) applyRescheduled(evt AppointmentRescheduledEvent) {
 	a.Status = AppointmentStatusHeld
 	a.HeldTimeSlot = evt.NewTimeSlot
+}
+
+// applyCancelled mutates aggregate state from an AppointmentCancelledEvent. It
+// moves the appointment into the cancelled state and clears the slot it held,
+// releasing it for other appointments. Like apply it is the single mutation
+// point for the cancelled event during both command handling and replay.
+func (a *AppointmentAggregate) applyCancelled(evt AppointmentCancelledEvent) {
+	a.Status = AppointmentStatusCancelled
+	a.HeldTimeSlot = ""
 }

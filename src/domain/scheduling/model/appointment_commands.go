@@ -39,3 +39,23 @@ type RescheduleAppointmentCmd struct {
 	// is being moved to.
 	NewTimeSlot string
 }
+
+// CancelAppointmentCmd requests that an existing appointment be cancelled,
+// releasing its held slot and applying any policy penalties the cancellation
+// incurs.
+//
+// Cancelling frees the slot the appointment held so it becomes available to
+// other appointments, and it is gated by the same scheduling invariants that
+// gate holding and rescheduling: the slot must fall within the provider's
+// published availability, at most one appointment may occupy a given slot at a
+// time (no double-booking), a slot whose prior hold lock has expired without
+// confirmation must have been released first, and cancel activity is only
+// permitted within the configured policy window. AppointmentId identifies the
+// appointment being cancelled and Reason records why it was cancelled; both are
+// mandatory.
+type CancelAppointmentCmd struct {
+	// AppointmentId identifies the appointment being cancelled.
+	AppointmentId string
+	// Reason records why the appointment is being cancelled.
+	Reason string
+}
