@@ -18,6 +18,14 @@ var (
 	// ErrMissingDosage is returned when ComposePrescriptionCmd omits the dosage.
 	ErrMissingDosage = errors.New("prescription: dosage is required")
 
+	// ErrMissingPrescription is returned when TransmitPrescriptionCmd omits the
+	// prescription id.
+	ErrMissingPrescription = errors.New("prescription: prescription id is required")
+
+	// ErrMissingPharmacy is returned when TransmitPrescriptionCmd omits the
+	// pharmacy id.
+	ErrMissingPharmacy = errors.New("prescription: pharmacy id is required")
+
 	// ErrProviderNotAuthorized is returned when the issuing provider is not an
 	// authenticated provider with an active care relationship to the patient.
 	// Invariant: a prescription may only be issued by an authenticated provider

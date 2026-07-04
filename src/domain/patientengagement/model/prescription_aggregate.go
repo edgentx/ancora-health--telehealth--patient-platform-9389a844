@@ -67,6 +67,8 @@ func (a *PrescriptionAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, 
 	switch c := cmd.(type) {
 	case ComposePrescriptionCmd:
 		return a.composePrescription(c)
+	case TransmitPrescriptionCmd:
+		return a.transmitPrescription(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -142,4 +144,65 @@ func (a *PrescriptionAggregate) apply(evt PrescriptionComposedEvent) {
 	a.ScopedProviderID = evt.ProviderID
 	a.Medication = evt.Medication
 	a.Dosage = evt.Dosage
+}
+
+// transmitPrescription handles TransmitPrescriptionCmd: it validates the command
+// input, enforces the prescription invariants, then emits a
+// PrescriptionTransmittedEvent and buffers it on the aggregate.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the prescription and destination pharmacy must both be
+//     identified.
+//   - Provider authorization: only an authenticated provider with an active care
+//     relationship to the patient may issue — and therefore transmit — the
+//     prescription.
+//   - Safety checks: a prescription failing an allergy or interaction check may
+//     not be transmitted until the failure is acknowledged/overridden.
+//   - Immutability: a transmitted prescription is sealed and may only be
+//     superseded by a cancellation, never re-transmitted.
+func (a *PrescriptionAggregate) transmitPrescription(cmd TransmitPrescriptionCmd) ([]shared.DomainEvent, error) {
+	if cmd.PrescriptionId == "" {
+		return nil, ErrMissingPrescription
+	}
+	if cmd.PharmacyId == "" {
+		return nil, ErrMissingPharmacy
+	}
+
+	// Invariant: a prescription may only be issued by an authenticated provider
+	// with an active care relationship to the patient.
+	if a.ProviderUnauthorized {
+		return nil, ErrProviderNotAuthorized
+	}
+
+	// Invariant: a prescription failing an allergy or interaction check cannot be
+	// transmitted until the failure has been acknowledged or overridden.
+	if a.SafetyCheckFailed && !a.SafetyOverrideAcknowledged {
+		return nil, ErrSafetyCheckUnacknowledged
+	}
+
+	// Invariant: a transmitted prescription is immutable. Re-transmitting one
+	// would dispatch a sealed order twice, so it is rejected — a change must be a
+	// cancellation that supersedes it.
+	if a.Status == PrescriptionStatusTransmitted {
+		return nil, ErrTransmittedImmutable
+	}
+
+	evt := PrescriptionTransmittedEvent{
+		PrescriptionID: a.ID,
+		PharmacyID:     cmd.PharmacyId,
+	}
+
+	a.applyTransmitted(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyTransmitted mutates aggregate state from a PrescriptionTransmittedEvent.
+// Like apply, it is the single place transmission state changes, so it serves
+// both command handling and future event replay when rehydrating from the store.
+func (a *PrescriptionAggregate) applyTransmitted(evt PrescriptionTransmittedEvent) {
+	a.Status = PrescriptionStatusTransmitted
 }

@@ -21,3 +21,21 @@ type ComposePrescriptionCmd struct {
 	// Dosage is the dosage instruction drafted for the medication.
 	Dosage string
 }
+
+// TransmitPrescriptionCmd requests that a drafted Prescription be sent to the
+// pharmacy gateway for fulfillment.
+//
+// Transmission is the sealing act: it dispatches the order to a pharmacy and,
+// once done, the prescription is immutable and may only be superseded by a
+// cancellation. The same issuing invariants that gate composition gate
+// transmission — the prescription must have been issued by an authenticated
+// provider with an active care relationship, and it must clear (or have an
+// acknowledged override for) its allergy and interaction checks before it can
+// leave for the pharmacy. PrescriptionId identifies the order to transmit and
+// PharmacyId the destination gateway; both are mandatory.
+type TransmitPrescriptionCmd struct {
+	// PrescriptionId identifies the prescription being transmitted.
+	PrescriptionId string
+	// PharmacyId identifies the pharmacy gateway the prescription is sent to.
+	PharmacyId string
+}
