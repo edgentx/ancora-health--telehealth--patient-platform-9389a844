@@ -11,6 +11,22 @@ var (
 	// accountable for the publication.
 	ErrMissingAuthor = errors.New("authorizationpolicy: author is required")
 
+	// ErrMissingSubjectAttrs is returned when EvaluateAccessCmd carries no subject
+	// attributes to evaluate the policy rules against.
+	ErrMissingSubjectAttrs = errors.New("authorizationpolicy: subject attributes are required")
+
+	// ErrMissingResourceRef is returned when EvaluateAccessCmd omits the resource
+	// reference the subject is attempting to access.
+	ErrMissingResourceRef = errors.New("authorizationpolicy: resource reference is required")
+
+	// ErrMissingAction is returned when EvaluateAccessCmd omits the action the
+	// subject wants to perform on the resource.
+	ErrMissingAction = errors.New("authorizationpolicy: action is required")
+
+	// ErrMissingCareContext is returned when EvaluateAccessCmd omits the care
+	// context the request must be evaluated within.
+	ErrMissingCareContext = errors.New("authorizationpolicy: care context is required")
+
 	// ErrDefaultDenyMissing is returned when the ruleset does not default to deny.
 	// Invariant: a decision must default to deny when no matching allow rule
 	// exists.
