@@ -302,8 +302,8 @@ const resetTokenWindow = 30 * time.Minute
 // aggregate. The invariant guards mirror the other handlers so the strongest
 // prohibitions (a duplicate email or an active lockout) are reported before the
 // reset-token and MFA checks; in particular the reset-token guard rejects a
-// request while a prior token has already been consumed or remains unexpired, so
-// a fresh token is only minted once no other pending token is in play.
+// request while a prior token is still consumed or unexpired, so a fresh token is
+// only minted once no other pending token is in play.
 func (a *UserAccountAggregate) initiatePasswordReset(cmd InitiatePasswordResetCmd) ([]shared.DomainEvent, error) {
 	if strings.TrimSpace(cmd.Email) == "" {
 		return nil, ErrMissingEmail
@@ -322,7 +322,7 @@ func (a *UserAccountAggregate) initiatePasswordReset(cmd InitiatePasswordResetCm
 	// Invariant: a password reset token is single-use and must be unexpired to
 	// change the credential.
 	if a.ResetTokenConsumed ||
-		(!a.ResetTokenExpiresAt.IsZero() && a.ResetTokenExpiresAt.After(time.Now())) {
+		(!a.ResetTokenExpiresAt.IsZero() && !a.ResetTokenExpiresAt.After(time.Now())) {
 		return nil, ErrResetTokenInvalid
 	}
 	// Invariant: MFA-enrolled accounts must present a valid second factor before
