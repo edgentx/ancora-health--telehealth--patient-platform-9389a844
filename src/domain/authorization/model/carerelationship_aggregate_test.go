@@ -6,13 +6,10 @@ import (
 )
 
 func TestRevokeCareRelationshipEmitsRevokedEvent(t *testing.T) {
-	aggregate := &CareRelationshipAggregate{
-		ID:     "relationship-123",
-		Status: RelationshipStatusActive,
-	}
+	aggregate := &CareRelationshipAggregate{}
 
 	events, err := aggregate.Execute(RevokeCareRelationshipCmd{
-		RelationshipID: "relationship-123",
+		RelationshipId: "relationship-123",
 		Reason:         "care episode ended",
 	})
 	if err != nil {
@@ -38,6 +35,9 @@ func TestRevokeCareRelationshipEmitsRevokedEvent(t *testing.T) {
 	if aggregate.Status != RelationshipStatusRevoked {
 		t.Fatalf("aggregate status = %q, want %q", aggregate.Status, RelationshipStatusRevoked)
 	}
+	if aggregate.ID != "relationship-123" {
+		t.Fatalf("aggregate id = %q, want relationship-123", aggregate.ID)
+	}
 	if aggregate.Version != 1 {
 		t.Fatalf("aggregate version = %d, want 1", aggregate.Version)
 	}
@@ -55,8 +55,8 @@ func TestRevokeCareRelationshipRejectsDomainInvariantViolations(t *testing.T) {
 		{
 			name: "provider may only access PHI with active relationship",
 			aggregate: CareRelationshipAggregate{
-				ID:     "relationship-123",
-				Status: RelationshipStatusPending,
+				ID:       "relationship-123",
+				Inactive: true,
 			},
 			wantErr: ErrNoActiveRelationship,
 		},

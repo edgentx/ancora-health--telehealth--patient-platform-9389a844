@@ -31,11 +31,14 @@ type EstablishCareRelationshipCmd struct {
 // a patient's PHI when an active care relationship exists, a care relationship
 // must be revoked when the care episode ends, and a relationship cannot be
 // self-asserted by the accessing party without a governing grant. RelationshipID
-// and Reason are both mandatory.
+// (or the RelationshipId alias used by some neighboring commands) and Reason are
+// both mandatory.
 type RevokeCareRelationshipCmd struct {
 	// RelationshipID identifies the care relationship whose grant is being
 	// revoked.
 	RelationshipID string
+	// RelationshipId is accepted as a compatibility alias for RelationshipID.
+	RelationshipId string
 	// Reason records why the care relationship is being ended.
 	Reason string
 }

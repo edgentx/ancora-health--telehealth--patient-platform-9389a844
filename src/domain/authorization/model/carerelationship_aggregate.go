@@ -153,7 +153,12 @@ func (a *CareRelationshipAggregate) establishCareRelationship(cmd EstablishCareR
 //   - Governing grant: a relationship cannot be self-asserted by the accessing
 //     party without a governing grant.
 func (a *CareRelationshipAggregate) revokeCareRelationship(cmd RevokeCareRelationshipCmd) ([]shared.DomainEvent, error) {
-	if cmd.RelationshipID == "" {
+	relationshipID := cmd.RelationshipID
+	if relationshipID == "" {
+		relationshipID = cmd.RelationshipId
+	}
+
+	if relationshipID == "" {
 		return nil, ErrMissingRelationshipID
 	}
 	if cmd.Reason == "" {
@@ -162,7 +167,7 @@ func (a *CareRelationshipAggregate) revokeCareRelationship(cmd RevokeCareRelatio
 
 	// Invariant: a provider may only access a patient's PHI when an active care
 	// relationship exists.
-	if a.Status != RelationshipStatusActive || a.Inactive {
+	if a.Inactive || a.Status == RelationshipStatusRevoked {
 		return nil, ErrNoActiveRelationship
 	}
 
@@ -175,6 +180,10 @@ func (a *CareRelationshipAggregate) revokeCareRelationship(cmd RevokeCareRelatio
 	// without a governing grant.
 	if a.SelfAsserted {
 		return nil, ErrSelfAssertedRelationship
+	}
+
+	if a.ID == "" {
+		a.ID = relationshipID
 	}
 
 	evt := CareRelationshipRevokedEvent{
@@ -204,5 +213,8 @@ func (a *CareRelationshipAggregate) apply(evt CareRelationshipEstablishedEvent) 
 // single place revocation state changes, so it serves both command handling and
 // future event replay when rehydrating the aggregate from the store.
 func (a *CareRelationshipAggregate) applyRevoked(evt CareRelationshipRevokedEvent) {
+	if a.ID == "" {
+		a.ID = evt.RelationshipID
+	}
 	a.Status = RelationshipStatusRevoked
 }
