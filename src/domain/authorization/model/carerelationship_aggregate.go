@@ -16,6 +16,10 @@ const (
 	// RelationshipStatusActive is a relationship whose grant is in force,
 	// authorizing the provider to access the patient's PHI.
 	RelationshipStatusActive RelationshipStatus = "active"
+	// RelationshipStatusRevoked is a relationship whose grant has been ended,
+	// withdrawing the provider's authorization to access the patient's PHI. It is
+	// the terminal state RevokeCareRelationshipCmd produces.
+	RelationshipStatusRevoked RelationshipStatus = "revoked"
 )
 
 // CareRelationshipAggregate is the authorization aggregate that tracks the
@@ -71,6 +75,8 @@ func (a *CareRelationshipAggregate) Execute(cmd interface{}) ([]shared.DomainEve
 	switch c := cmd.(type) {
 	case EstablishCareRelationshipCmd:
 		return a.establishCareRelationship(c)
+	case RevokeCareRelationshipCmd:
+		return a.revokeCareRelationship(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -131,6 +137,58 @@ func (a *CareRelationshipAggregate) establishCareRelationship(cmd EstablishCareR
 	return []shared.DomainEvent{evt}, nil
 }
 
+// revokeCareRelationship handles RevokeCareRelationshipCmd: it validates the
+// command input, enforces the care-relationship invariants, then emits a
+// CareRelationshipRevokedEvent and buffers it on the aggregate. Revoking takes
+// the in-force grant out of force, withdrawing the provider's authorization to
+// access the patient's PHI.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the relationship id and the reason must both be present.
+//   - Active relationship: a provider may only access a patient's PHI when an
+//     active care relationship exists.
+//   - Episode revocation: a care relationship must be revoked when the care
+//     episode ends.
+//   - Governing grant: a relationship cannot be self-asserted by the accessing
+//     party without a governing grant.
+func (a *CareRelationshipAggregate) revokeCareRelationship(cmd RevokeCareRelationshipCmd) ([]shared.DomainEvent, error) {
+	if cmd.RelationshipID == "" {
+		return nil, ErrMissingRelationshipID
+	}
+	if cmd.Reason == "" {
+		return nil, ErrMissingReason
+	}
+
+	// Invariant: a provider may only access a patient's PHI when an active care
+	// relationship exists.
+	if a.Status != RelationshipStatusActive || a.Inactive {
+		return nil, ErrNoActiveRelationship
+	}
+
+	// Invariant: a care relationship must be revoked when the care episode ends.
+	if a.EpisodeEnded {
+		return nil, ErrCareEpisodeEnded
+	}
+
+	// Invariant: a relationship cannot be self-asserted by the accessing party
+	// without a governing grant.
+	if a.SelfAsserted {
+		return nil, ErrSelfAssertedRelationship
+	}
+
+	evt := CareRelationshipRevokedEvent{
+		RelationshipID: a.ID,
+		Reason:         cmd.Reason,
+	}
+
+	a.applyRevoked(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
 // apply mutates aggregate state from a domain event. It is the single place
 // state changes, so the same function serves both command handling and future
 // event replay when rehydrating the aggregate from the store.
@@ -139,4 +197,12 @@ func (a *CareRelationshipAggregate) apply(evt CareRelationshipEstablishedEvent) 
 	a.ProviderID = evt.ProviderID
 	a.PatientID = evt.PatientID
 	a.ClinicID = evt.ClinicID
+}
+
+// applyRevoked mutates aggregate state from a CareRelationshipRevokedEvent,
+// moving the relationship to its terminal revoked state. Like apply, it is the
+// single place revocation state changes, so it serves both command handling and
+// future event replay when rehydrating the aggregate from the store.
+func (a *CareRelationshipAggregate) applyRevoked(evt CareRelationshipRevokedEvent) {
+	a.Status = RelationshipStatusRevoked
 }

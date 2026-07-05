@@ -15,6 +15,14 @@ var (
 	// clinic the care relationship is scoped within.
 	ErrMissingClinicID = errors.New("carerelationship: clinic id is required")
 
+	// ErrMissingRelationshipID is returned when RevokeCareRelationshipCmd omits the
+	// relationship whose grant is being revoked.
+	ErrMissingRelationshipID = errors.New("carerelationship: relationship id is required")
+
+	// ErrMissingReason is returned when RevokeCareRelationshipCmd omits the reason
+	// the care relationship is being ended.
+	ErrMissingReason = errors.New("carerelationship: reason is required")
+
 	// ErrNoActiveRelationship is returned when the grant would not be active.
 	// Invariant: a provider may only access a patient's PHI when an active care
 	// relationship exists.
