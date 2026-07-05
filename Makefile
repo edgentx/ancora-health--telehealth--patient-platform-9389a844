@@ -1,4 +1,4 @@
-.PHONY: build test lint
+.PHONY: build test lint gate
 
 build:
 	go build ./...
@@ -8,3 +8,11 @@ test:
 
 lint:
 	go vet ./...
+
+# gate — S-67 domain gate. Verifies the whole module builds and every domain
+# behavior (BDD) scenario under src/domain/**/model passes with zero failures.
+# This is the single command CI runs to keep the domain green.
+gate:
+	go build ./...
+	go vet ./...
+	go test ./...
