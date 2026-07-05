@@ -25,8 +25,7 @@ export const publicEnv = {
    * signaling. Defaults to the per-project edge host `ws.{project}.vforce360.ai`
    * in deployed environments; a local override points it at the dev server.
    */
-  wsBaseUrl:
-    process.env.NEXT_PUBLIC_WS_BASE_URL ?? `wss://ws.${projectSlug}.vforce360.ai`,
+  wsBaseUrl: process.env.NEXT_PUBLIC_WS_BASE_URL ?? `wss://ws.${projectSlug}.vforce360.ai`,
   /**
    * GraphQL path appended to {@link apiBaseUrl}. The backend serves gqlgen at a
    * single endpoint behind the edge.
@@ -37,6 +36,19 @@ export const publicEnv = {
    * backend can attribute client-originated spans.
    */
   otelServiceName: process.env.NEXT_PUBLIC_OTEL_SERVICE_NAME ?? 'ancora-web',
+  /**
+   * Edge endpoint that *starts* the managed login flow. The browser navigates
+   * here; the Kong+OPA edge runs the actual authentication (OIDC/session/MFA)
+   * and, on success, re-issues the request carrying the trusted identity
+   * headers. The client never handles a token — it only kicks off the redirect.
+   */
+  edgeLoginUrl: process.env.NEXT_PUBLIC_EDGE_LOGIN_URL ?? '/auth/login',
+  /**
+   * Edge endpoint that ends the session. The browser navigates here after the
+   * client clears its local identity mirror; the edge invalidates the session
+   * and returns the user to the entry view as an unauthenticated `guest`.
+   */
+  edgeLogoutUrl: process.env.NEXT_PUBLIC_EDGE_LOGOUT_URL ?? '/auth/logout',
 } as const;
 
 /**

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { Identity } from '@/lib/identity';
 import { ROLE_LABELS, ROLE_LANDING, ROLE_NAV, UTILITY_NAV, type Role } from '@/lib/roles';
 
+import { LogoutButton } from './logout-button';
 import { RoleBadge } from './role-badge';
 
 /**
@@ -54,7 +55,10 @@ export function AppShell({
       <div className="shell__main">
         <header className="shell__topbar">
           <span className="shell__surface-label">{ROLE_LABELS[surface]} workspace</span>
-          <RoleBadge />
+          <div className="shell__topbar-actions">
+            <RoleBadge />
+            <LogoutButton />
+          </div>
         </header>
         <main className="shell__content">{children}</main>
       </div>
