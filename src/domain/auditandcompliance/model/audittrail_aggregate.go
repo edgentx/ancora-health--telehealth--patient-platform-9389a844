@@ -50,6 +50,20 @@ func (a *AuditTrailAggregate) HeadHash() string {
 	return a.entries[len(a.entries)-1].Hash
 }
 
+// RehydrateAuditTrail reconstructs an AuditTrailAggregate from its persisted
+// sealed entries, supplied in chain order. It is the inverse of Entries() used
+// by a repository when loading a trail from storage: it restores the chain
+// verbatim — without re-running the append invariants — so a persisted (and
+// possibly tampered) chain can be loaded and then re-verified via
+// VerifyChainIntegrityCmd. The aggregate version is set to the number of sealed
+// entries, matching how appendAuditEntry advances it one step per entry.
+func RehydrateAuditTrail(id string, entries []AuditEntry) *AuditTrailAggregate {
+	a := &AuditTrailAggregate{ID: id}
+	a.entries = append(a.entries, entries...)
+	a.Version = len(entries)
+	return a
+}
+
 // Execute applies a command to the aggregate and returns the domain events it
 // produced. Unrecognized commands yield shared.ErrUnknownCommand.
 func (a *AuditTrailAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, error) {
