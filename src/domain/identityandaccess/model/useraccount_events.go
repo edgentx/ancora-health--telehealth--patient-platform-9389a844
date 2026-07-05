@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/shared"
+)
 
 // UserRegisteredEvent records that a user account was successfully registered
 // after passing every registration invariant. Its Type() is the wire contract
@@ -103,3 +107,13 @@ func (e UserLoginFailedEvent) Type() string { return "user.login.failed" }
 
 // AggregateID ties the event back to the UserAccount that produced it.
 func (e UserLoginFailedEvent) AggregateID() string { return e.UserID }
+
+// Compile-time assertions that UserAccount events satisfy the DomainEvent
+// contract expected by Aggregate.Execute.
+var (
+	_ shared.DomainEvent = UserRegisteredEvent{}
+	_ shared.DomainEvent = UserAccountLockedEvent{}
+	_ shared.DomainEvent = UserAuthenticatedEvent{}
+	_ shared.DomainEvent = UserPasswordResetRequestedEvent{}
+	_ shared.DomainEvent = UserLoginFailedEvent{}
+)
