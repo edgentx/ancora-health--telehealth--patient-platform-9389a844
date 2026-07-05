@@ -16,10 +16,19 @@ import type {
   CancelAppointmentRequest,
   HoldSlotRequest,
   ProviderSchedule,
+  ProviderSummary,
   RegisterWalkInRequest,
   RescheduleAppointmentRequest,
 } from '../models/scheduling';
 import { queryKeys } from './keys';
+
+export function useProviders() {
+  return useQuery({
+    queryKey: queryKeys.scheduling.providers(),
+    queryFn: () =>
+      apiClient.rest.get<ProviderSummary[]>('/api/scheduling/providers'),
+  });
+}
 
 export function useAppointments() {
   return useQuery({

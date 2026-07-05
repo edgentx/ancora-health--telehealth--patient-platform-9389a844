@@ -48,7 +48,35 @@ export interface Prescription {
   id: Id;
   status: PrescriptionStatus;
   patientId: Id;
+  /** Provider who composed the order, when the read model exposes it. */
+  providerId?: Id;
   medication: string;
+  /** Dosage instruction drafted with the medication. */
+  dosage?: string;
+  version: number;
+}
+
+/** Intake-form lifecycle. */
+export type IntakeFormStatus = 'pending' | 'submitted';
+
+/** A single answered field on a pre-visit intake form. */
+export interface IntakeAnswer {
+  /** Stable field key (e.g. `chief_complaint`, `allergies`). */
+  key: string;
+  /** Human-facing prompt shown next to the answer. */
+  label: string;
+  /** The patient's answer. */
+  value: string;
+}
+
+/** A patient-completed pre-visit intake form. */
+export interface IntakeForm {
+  id: Id;
+  status: IntakeFormStatus;
+  patientId: Id;
+  appointmentId?: Id;
+  answers: IntakeAnswer[];
+  submittedAt?: IsoDateTime;
   version: number;
 }
 
@@ -63,4 +91,22 @@ export interface StartMessageThreadRequest {
 export interface PostMessageRequest {
   threadId: Id;
   body: string;
+}
+
+/**
+ * ComposePrescriptionCmd: draft a new prescription for a patient. Mirrors the
+ * backend command's mandatory fields — patient, provider, medication, dosage.
+ */
+export interface ComposePrescriptionRequest {
+  patientId: Id;
+  providerId: Id;
+  medication: string;
+  dosage: string;
+}
+
+/** SubmitIntakeCmd: submit a patient's completed pre-visit intake answers. */
+export interface SubmitIntakeRequest {
+  patientId: Id;
+  appointmentId?: Id;
+  answers: IntakeAnswer[];
 }

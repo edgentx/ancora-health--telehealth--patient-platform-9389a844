@@ -29,6 +29,19 @@ export interface ProviderSchedule {
   slots: IsoDateTime[];
 }
 
+/**
+ * A discoverable provider directory entry, used by the patient booking flow to
+ * choose who to book with before loading that provider's open slots.
+ */
+export interface ProviderSummary {
+  id: Id;
+  name: string;
+  specialty: string;
+  clinicId?: Id;
+  /** Whether the provider is currently accepting new bookings. */
+  acceptingNew: boolean;
+}
+
 /** HoldSlotCmd: reserve a provider slot for a patient. */
 export interface HoldSlotRequest {
   providerId: Id;
