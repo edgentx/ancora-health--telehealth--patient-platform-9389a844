@@ -1,0 +1,12 @@
+{{- if and .Values.kong.enabled .Values.kong.opa.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ancora.fullname" . }}-opa-policy
+  namespace: {{ include "ancora.namespace" . }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+data:
+  policy.rego: |
+{{ .Values.opaPolicy | indent 4 }}
+{{- end -}}

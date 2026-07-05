@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ancora.configMapName" . }}
+  namespace: {{ include "ancora.namespace" . }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+data:
+  {{- range $key, $val := .Values.config }}
+  {{- if ne $key "extra" }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}
+  {{- end }}
+  {{- range $key, $val := .Values.config.extra }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}

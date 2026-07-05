@@ -1,0 +1,78 @@
+{{- if .Values.ingress.enabled -}}
+{{- $root := . -}}
+{{- $fullname := include "ancora.fullname" . -}}
+{{- $apiSvc := printf "%s-api" $fullname -}}
+{{- $wsSvc := printf "%s-realtime" $fullname -}}
+{{- $apiPort := .Values.components.api.service.port -}}
+{{- $wsPort := .Values.components.realtime.service.port -}}
+{{- /* Assemble the Kong plugin list attached at the edge. */ -}}
+{{- $plugins := list -}}
+{{- if .Values.kong.enabled -}}
+{{- if .Values.kong.jwt.enabled -}}{{- $plugins = append $plugins (printf "%s-jwt" $fullname) -}}{{- end -}}
+{{- if .Values.kong.cors.enabled -}}{{- $plugins = append $plugins (printf "%s-cors" $fullname) -}}{{- end -}}
+{{- if .Values.kong.tenant.enabled -}}{{- $plugins = append $plugins (printf "%s-tenant" $fullname) -}}{{- end -}}
+{{- if .Values.kong.rateLimiting.enabled -}}{{- $plugins = append $plugins (printf "%s-rate-limiting" $fullname) -}}{{- end -}}
+{{- if .Values.kong.opa.enabled -}}{{- $plugins = append $plugins (printf "%s-opa" $fullname) -}}{{- end -}}
+{{- end -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ include "ancora.namespace" . }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.certManager.enabled }}
+    {{- if eq .Values.ingress.certManager.issuerKind "ClusterIssuer" }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certManager.issuer | quote }}
+    {{- else }}
+    cert-manager.io/issuer: {{ .Values.ingress.certManager.issuer | quote }}
+    {{- end }}
+    {{- end }}
+    # WebSocket upgrade support + long-lived connection timeouts for the ws host.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: {{ .Values.ingress.websocket.readTimeoutSeconds | quote }}
+    nginx.ingress.kubernetes.io/proxy-send-timeout: {{ .Values.ingress.websocket.sendTimeoutSeconds | quote }}
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- if and .Values.kong.enabled $plugins }}
+    # Kong attaches these plugins when it is the ingress controller.
+    konghq.com/plugins: {{ join "," $plugins | quote }}
+    konghq.com/protocols: "https"
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.app | quote }}
+        - {{ .Values.ingress.hosts.ws | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hosts.app | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $apiSvc }}
+                port:
+                  number: {{ $apiPort }}
+    - host: {{ .Values.ingress.hosts.ws | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $wsSvc }}
+                port:
+                  number: {{ $wsPort }}
+{{- end -}}

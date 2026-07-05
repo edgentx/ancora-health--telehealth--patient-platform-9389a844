@@ -1,0 +1,106 @@
+{{- if .Values.kong.enabled -}}
+{{- $root := . -}}
+{{- $fullname := include "ancora.fullname" . -}}
+{{- $ns := include "ancora.namespace" . -}}
+{{- if .Values.kong.jwt.enabled }}
+---
+# Edge JWT validation. Consumers register their JWT credentials with Kong; the
+# gateway rejects requests without a valid signed token before they reach the API.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ $fullname }}-jwt
+  namespace: {{ $ns }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+plugin: jwt
+config:
+  key_claim_name: {{ .Values.kong.jwt.keyClaimName }}
+  claims_to_verify:
+    {{- toYaml .Values.kong.jwt.claimsToVerify | nindent 4 }}
+  run_on_preflight: false
+{{- end }}
+{{- if .Values.kong.cors.enabled }}
+---
+# CORS handling at the edge.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ $fullname }}-cors
+  namespace: {{ $ns }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+plugin: cors
+config:
+  origins:
+    {{- toYaml .Values.kong.cors.origins | nindent 4 }}
+  methods:
+    {{- toYaml .Values.kong.cors.methods | nindent 4 }}
+  headers:
+    {{- toYaml .Values.kong.cors.headers | nindent 4 }}
+  credentials: {{ .Values.kong.cors.credentials }}
+  max_age: {{ .Values.kong.cors.maxAge }}
+  preflight_continue: false
+{{- end }}
+{{- if .Values.kong.tenant.enabled }}
+---
+# Per-tenant header injection + API version pinning. request-transformer adds the
+# tenant and API-version headers upstream so both the API and the OPA policy can
+# rely on them being present.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ $fullname }}-tenant
+  namespace: {{ $ns }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+plugin: request-transformer
+config:
+  add:
+    headers:
+      - {{ printf "%s:$(headers.%s)" .Values.kong.tenant.header .Values.kong.tenant.header | quote }}
+      - {{ printf "%s:%s" .Values.kong.tenant.apiVersionHeader .Values.kong.tenant.apiVersion | quote }}
+  replace:
+    headers:
+      - {{ printf "%s:%s" .Values.kong.tenant.apiVersionHeader .Values.kong.tenant.apiVersion | quote }}
+{{- end }}
+{{- if .Values.kong.rateLimiting.enabled }}
+---
+# Redis-backed rate limiting at the edge — shared counters across all Kong
+# replicas via Redis.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ $fullname }}-rate-limiting
+  namespace: {{ $ns }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+plugin: rate-limiting
+config:
+  minute: {{ .Values.kong.rateLimiting.minute }}
+  policy: {{ .Values.kong.rateLimiting.policy }}
+  redis:
+    host: {{ .Values.kong.rateLimiting.redisHost }}
+    port: {{ .Values.kong.rateLimiting.redisPort }}
+  fault_tolerant: true
+  hide_client_headers: false
+{{- end }}
+{{- if .Values.kong.opa.enabled }}
+---
+# OPA external authorization. Kong calls the in-pod OPA sidecar for a per-request
+# allow/deny decision after JWT validation and header injection.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ $fullname }}-opa
+  namespace: {{ $ns }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+plugin: opa
+config:
+  opa_host: 127.0.0.1
+  opa_port: {{ .Values.kong.opa.port }}
+  opa_path: {{ .Values.kong.opa.decisionPath }}
+  opa_protocol: http
+{{- end }}
+{{- end -}}

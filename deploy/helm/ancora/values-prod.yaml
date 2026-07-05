@@ -1,0 +1,49 @@
+# Production overlay example for the VForce360 MicroK8s cluster.
+#
+# Apply with:
+#   helm upgrade --install ancora deploy/helm/ancora \
+#     -n ancora --create-namespace \
+#     -f deploy/helm/ancora/values-prod.yaml \
+#     --set-file secrets.data.MONGODB_URI=/run/secrets/mongodb_uri
+#
+# Secrets are intentionally NOT set here — supply them out-of-band
+# (secrets.existingSecret) or via --set-file at deploy time.
+
+image:
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+components:
+  api:
+    replicas: 3
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: "2"
+        memory: 1Gi
+  realtime:
+    replicas: 3
+  worker:
+    replicas: 2
+
+config:
+  MONGODB_DATABASE: ancora_prod
+  TEMPORAL_NAMESPACE: ancora
+  MINIO_USE_SSL: "true"
+
+ingress:
+  hosts:
+    app: app.ancora.vforce360.ai
+    ws: ws.ancora.vforce360.ai
+  certManager:
+    issuer: letsencrypt-prod
+    issuerKind: ClusterIssuer
+
+kong:
+  cors:
+    origins:
+      - https://app.ancora.vforce360.ai
+  rateLimiting:
+    minute: 1200
