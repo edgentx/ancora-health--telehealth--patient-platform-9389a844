@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/audit"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/crypto"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/locking"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/persistence/mongodb"
@@ -33,6 +34,8 @@ func buildContainer(ctx context.Context) rest.Dependencies {
 	locker := locking.NewMemorySlotLocker()
 	cipher := loadFieldCipher()
 
+	auditTrails := mongodb.NewAuditTrailRepository(mongodb.NewMemAuditEntryCollection())
+
 	return rest.Dependencies{
 		Health:            resolveHealth(ctx),
 		Appointments:      mongodb.NewAppointmentRepository(store, store, locker, ""),
@@ -41,7 +44,14 @@ func buildContainer(ctx context.Context) rest.Dependencies {
 		Prescriptions:     mongodb.NewPrescriptionRepository(store, cipher),
 		InsurancePolicies: mongodb.NewInsurancePolicyRepository(store, cipher),
 		ClinicDirectories: mongodb.NewClinicDirectoryRepository(store),
-		AuditTrails:       mongodb.NewAuditTrailRepository(mongodb.NewMemAuditEntryCollection()),
+		AuditTrails:       auditTrails,
+		// Cross-context flows added in S-75. The pharmacy gateway and payment
+		// webhook are left unset in a local run (they require a live upstream and
+		// a shared signing secret); the integration suite wires stubs for them.
+		Encounters: mongodb.NewEncounterRepository(store, cipher),
+		Invoices:   mongodb.NewInvoiceRepository(store),
+		Payments:   mongodb.NewPaymentRepository(store, cipher),
+		Audit:      audit.NewTrailRecorder(auditTrails),
 	}
 }
 

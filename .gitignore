@@ -12,6 +12,7 @@ node_modules/
 
 # Go
 /bin/
+coverage*.out
 
 # IDE
 .idea/

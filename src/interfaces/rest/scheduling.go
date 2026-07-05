@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -8,6 +10,37 @@ import (
 	schedmodel "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/scheduling/model"
 	schedulingrepo "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/scheduling/repository"
 )
+
+// slotBooker is the optional capability a concrete AppointmentRepository may
+// expose to reserve a slot under an exclusive, cross-process hold (the S-70
+// Redis SetNX slot lock) rather than a plain, id-scoped Save. The scheduling
+// handler type-asserts for it so the double-booking guarantee is exercised
+// whenever the real repository is wired, while the in-memory fake — which only
+// satisfies the two-method port — transparently falls back to Save. Keeping it
+// an optional interface is what lets the slot lock reach the API without
+// widening the domain port every test double would then have to implement.
+type slotBooker interface {
+	Book(ctx context.Context, a *schedmodel.AppointmentAggregate) error
+}
+
+// reserveSlot persists a freshly held appointment. When appts can take a slot
+// hold it books under the exclusive lock, translating the domain's
+// double-booking conflict into the tagged 409 the classifier surfaces; two
+// concurrent holds on the same provider/time-slot then resolve to exactly one
+// created appointment and one conflict. Otherwise it degrades to a plain Save.
+func reserveSlot(ctx context.Context, appts schedulingrepo.AppointmentRepository, a *schedmodel.AppointmentAggregate) error {
+	booker, ok := appts.(slotBooker)
+	if !ok {
+		return appts.Save(ctx, a)
+	}
+	if err := booker.Book(ctx, a); err != nil {
+		if errors.Is(err, schedmodel.ErrSlotDoubleBooked) {
+			return asConflict(err)
+		}
+		return err
+	}
+	return nil
+}
 
 // schedulingAPI adapts the scheduling bounded context (appointments and provider
 // schedules) to HTTP. It holds only the domain repository ports, so it can be
@@ -133,7 +166,7 @@ func (h schedulingAPI) holdSlot(w http.ResponseWriter, r *http.Request) {
 		writeError(w, execErr(err, schedmodel.ErrSlotDoubleBooked))
 		return
 	}
-	if err := h.appointments.Save(r.Context(), agg); err != nil {
+	if err := reserveSlot(r.Context(), h.appointments, agg); err != nil {
 		writeError(w, err)
 		return
 	}
