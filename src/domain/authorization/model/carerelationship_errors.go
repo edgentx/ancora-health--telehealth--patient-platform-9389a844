@@ -11,8 +11,8 @@ var (
 	// patient whose PHI the grant authorizes access to.
 	ErrMissingPatientID = errors.New("carerelationship: patient id is required")
 
-	// ErrMissingClinicID is returned when EstablishCareRelationshipCmd omits the
-	// clinic the care relationship is scoped within.
+	// ErrMissingClinicID is returned when EstablishCareRelationshipCmd or
+	// AssignScopedRoleCmd omits the clinic the grant is scoped within.
 	ErrMissingClinicID = errors.New("carerelationship: clinic id is required")
 
 	// ErrMissingRelationshipID is returned when RevokeCareRelationshipCmd omits the
@@ -22,6 +22,14 @@ var (
 	// ErrMissingReason is returned when RevokeCareRelationshipCmd omits the reason
 	// the care relationship is being ended.
 	ErrMissingReason = errors.New("carerelationship: reason is required")
+
+	// ErrMissingAccountID is returned when AssignScopedRoleCmd omits the account
+	// being granted the role.
+	ErrMissingAccountID = errors.New("carerelationship: account id is required")
+
+	// ErrMissingRole is returned when AssignScopedRoleCmd omits the role being
+	// granted to the account.
+	ErrMissingRole = errors.New("carerelationship: role is required")
 
 	// ErrNoActiveRelationship is returned when the grant would not be active.
 	// Invariant: a provider may only access a patient's PHI when an active care
