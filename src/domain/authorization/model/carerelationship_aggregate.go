@@ -162,7 +162,7 @@ func (a *CareRelationshipAggregate) revokeCareRelationship(cmd RevokeCareRelatio
 
 	// Invariant: a provider may only access a patient's PHI when an active care
 	// relationship exists.
-	if a.Inactive {
+	if a.Status != RelationshipStatusActive || a.Inactive {
 		return nil, ErrNoActiveRelationship
 	}
 
