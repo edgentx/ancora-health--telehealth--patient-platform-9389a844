@@ -29,6 +29,10 @@ var (
 	// ErrMissingReason is returned when BookAppointmentCmd omits the booking reason.
 	ErrMissingReason = errors.New("appointment: booking reason is required")
 
+	// ErrMissingCancelReason is returned when CancelAppointmentCmd omits the
+	// cancellation reason.
+	ErrMissingCancelReason = errors.New("appointment: cancellation reason is required")
+
 	// ErrSlotOutsideAvailability is returned when the requested slot falls outside
 	// the provider's published availability. Invariant: an appointment cannot be
 	// booked outside the provider's published availability.

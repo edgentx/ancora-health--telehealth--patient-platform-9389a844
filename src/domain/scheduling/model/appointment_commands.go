@@ -85,3 +85,23 @@ type BookAppointmentCmd struct {
 	// Reason records why the appointment is being booked.
 	Reason string
 }
+
+// CancelAppointmentCmd requests that an existing appointment be cancelled,
+// applying any policy penalties the cancellation incurs.
+//
+// Cancelling releases the slot the appointment held and takes the appointment to
+// a terminal state. Because cancellation is a scheduling action against the same
+// held slot, the same invariants that gate a hold gate the cancel — the slot must
+// fall within the provider's published availability, at most one appointment may
+// occupy a given slot at a time (no double-booking), a slot whose prior hold lock
+// has expired without confirmation must have been released first, and cancel
+// activity is only permitted within the configured policy window. AppointmentId
+// identifies the appointment being cancelled and Reason records why it was
+// cancelled (which drives the policy penalty); both are mandatory.
+type CancelAppointmentCmd struct {
+	// AppointmentId identifies the appointment being cancelled.
+	AppointmentId string
+	// Reason records why the appointment is being cancelled and drives the policy
+	// penalty applied on cancellation.
+	Reason string
+}
