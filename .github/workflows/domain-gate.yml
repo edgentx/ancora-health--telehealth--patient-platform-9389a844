@@ -1,0 +1,34 @@
+name: Domain Gate
+
+# S-67 — Domain gate: every domain behavior (BDD) scenario must stay green.
+# The bounded-context aggregate tests under src/domain/**/model encode the
+# Given/When/Then domain scenarios; this workflow is the gate that enforces
+# "all domain BDD tests green, zero failures" on every push and pull request.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  domain-gate:
+    name: All domain BDD scenarios green
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Domain BDD gate (full test suite, zero failures)
+        run: make gate
