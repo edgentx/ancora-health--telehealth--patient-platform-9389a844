@@ -48,7 +48,7 @@ jobs:
         with:
           # Must satisfy the go.mod `go 1.24.0` directive; caching is on by
           # default (keyed on go.sum) so module downloads are reused across runs.
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Integration suite with coverage (live MongoDB + Redis)
         env:

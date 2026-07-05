@@ -37,7 +37,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           # setup-go caches the module and build cache keyed on go.sum by default.
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: gofmt (formatting is a build failure)
         run: |
