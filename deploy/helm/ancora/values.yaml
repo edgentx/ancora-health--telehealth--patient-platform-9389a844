@@ -1,0 +1,288 @@
+# Default values for the Ancora Health platform chart.
+#
+# Every value here is a *sane default* meant to be overridden per environment
+# with `-f values-<env>.yaml` or `--set`. Nothing secret is baked in: the
+# `secrets` block is empty by default and is intended to be supplied either via
+# an out-of-band `existingSecret` or through `--set-file`/a sealed secret.
+
+# -- Override the generated resource name (defaults to the chart name).
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  # -- Render a Namespace object so `helm install` can create a dedicated one.
+  create: true
+  # -- The dedicated namespace all platform components deploy into.
+  name: ancora
+
+image:
+  # Images are built from the multi-stage Dockerfile as api/realtime/worker
+  # targets (S-76). `registry/repository` + a per-component `imageTarget` form
+  # the full reference, e.g. ghcr.io/edgentx/ancora/api:<tag>.
+  registry: ghcr.io/edgentx
+  repository: ancora
+  # -- Image tag; empty string falls back to the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  # -- Explicit name; empty string uses the fullname.
+  name: ""
+  annotations: {}
+
+# Prometheus scrape configuration surfaced as pod annotations so the cluster
+# Prometheus collects /metrics from every component pod.
+metrics:
+  enabled: true
+  path: /metrics
+  # -- Named container port scraped by Prometheus (see components[].containerPort).
+  portName: http
+
+# Default probes. Each entrypoint serves /health (liveness) and /ready
+# (readiness) from the shared platform ops surface; a component may override.
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Pod-level security context — runs as the distroless `nonroot` uid (65532).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level security context — least privilege, read-only rootfs.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  capabilities:
+    drop:
+      - ALL
+
+# Default resource requests/limits applied to every component unless the
+# component overrides `resources`.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Per-component configuration. The Deployment/Service templates range over this
+# map, so adding a component is a values change, not a new template.
+components:
+  api:
+    enabled: true
+    # imageTarget selects the Dockerfile build target -> image repo suffix.
+    imageTarget: api
+    replicas: 2
+    containerPort: 8000
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+    # Extra args passed to the entrypoint binary (none by default).
+    args: []
+    resources: {}
+    # OPA sidecar performs edge authorization for the API surface.
+    opa:
+      enabled: true
+
+  realtime:
+    enabled: true
+    imageTarget: realtime
+    replicas: 2
+    containerPort: 8000
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+    # Marks this component as the WebSocket backend for the ws.* Ingress host.
+    websocket: true
+    args: []
+    resources: {}
+    opa:
+      enabled: false
+
+  worker:
+    enabled: true
+    imageTarget: worker
+    replicas: 1
+    containerPort: 8000
+    # The Temporal worker exposes only the ops surface; it is scraped via pod
+    # annotations and needs no Service or Ingress route.
+    service:
+      enabled: false
+    args: []
+    resources: {}
+    opa:
+      enabled: false
+
+# Non-secret configuration -> ConfigMap, injected into every component via
+# envFrom. Secrets (below) supply the sensitive values with the same keys.
+config:
+  MONGODB_DATABASE: ancora
+  MONGODB_MAX_POOL_SIZE: "50"
+  MONGODB_MIN_POOL_SIZE: "5"
+  TEMPORAL_HOSTPORT: temporal-frontend.temporal.svc.cluster.local:7233
+  TEMPORAL_NAMESPACE: ancora
+  TEMPORAL_TASK_QUEUE: ancora-workers
+  COTURN_URIS: ""
+  ELIGIBILITY_BASE_URL: ""
+  PAYMENT_BASE_URL: ""
+  # Redis (rate limiting / pub-sub fan-out) and MinIO (object storage) endpoints.
+  REDIS_ADDR: redis-master.ancora.svc.cluster.local:6379
+  MINIO_ENDPOINT: minio.ancora.svc.cluster.local:9000
+  MINIO_BUCKET: ancora-media
+  MINIO_USE_SSL: "false"
+  # Arbitrary extra non-secret keys merged into the ConfigMap.
+  extra: {}
+
+# Secret material. NOTHING is hardcoded here: either reference a pre-provisioned
+# Secret via `existingSecret`, or leave `data` empty and supply values at
+# install time (`--set-file`, sealed-secrets, external-secrets, etc.). All
+# components mount this Secret via envFrom.
+secrets:
+  # -- Name of an out-of-band Secret to consume instead of rendering one.
+  existingSecret: ""
+  # Keys the platform reads. Empty defaults keep secrets out of the chart while
+  # documenting the required contract.
+  data:
+    MONGODB_URI: ""
+    REDIS_PASSWORD: ""
+    TEMPORAL_API_KEY: ""
+    MINIO_ACCESS_KEY: ""
+    MINIO_SECRET_KEY: ""
+    STRIPE_API_KEY: ""
+    STRIPE_WEBHOOK_SECRET: ""
+    # 32-byte hex master key that seals PHI at rest (crypto.FieldCipher).
+    PHI_MASTER_KEY: ""
+    # Shared secret coturn signs ephemeral TURN credentials with.
+    COTURN_SECRET: ""
+
+ingress:
+  enabled: true
+  # Ingress controller class. Kong plugin annotations (below) apply when the
+  # cluster's ingress controller is Kong; the WebSocket/cert-manager
+  # annotations apply under NGINX. Default targets the VForce360 NGINX ingress.
+  className: nginx
+  hosts:
+    # app.* serves the API + static app; ws.* serves the realtime gateway.
+    app: app.ancora.vforce360.ai
+    ws: ws.ancora.vforce360.ai
+  tls:
+    enabled: true
+    # Secret cert-manager writes the issued certificate into.
+    secretName: ancora-tls
+  certManager:
+    enabled: true
+    issuer: letsencrypt-prod
+    # ClusterIssuer or Issuer.
+    issuerKind: ClusterIssuer
+  # WebSocket upgrade + timeout tuning for the ws.* host (NGINX ingress).
+  websocket:
+    readTimeoutSeconds: 3600
+    sendTimeoutSeconds: 3600
+  # Extra annotations merged onto the Ingress (last write wins).
+  annotations: {}
+
+# Kong gateway + OPA policy edge. Rendered as KongPlugin custom resources plus
+# an OPA sidecar (attached to components with opa.enabled) and its Rego policy.
+kong:
+  enabled: true
+  # JWT validation at the edge.
+  jwt:
+    enabled: true
+    # Claims required on every token.
+    claimsToVerify:
+      - exp
+    # Header/query the token is read from.
+    keyClaimName: iss
+  # CORS handling.
+  cors:
+    enabled: true
+    origins:
+      - https://app.ancora.vforce360.ai
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    headers:
+      - Authorization
+      - Content-Type
+      - X-Tenant-ID
+    credentials: true
+    maxAge: 3600
+  # Per-tenant header injection + API versioning (request-transformer).
+  tenant:
+    enabled: true
+    header: X-Tenant-ID
+    apiVersionHeader: X-API-Version
+    apiVersion: v1
+  # Redis-backed rate limiting at the edge.
+  rateLimiting:
+    enabled: true
+    minute: 600
+    policy: redis
+    redisHost: redis-master.ancora.svc.cluster.local
+    redisPort: 6379
+    # References secrets.data.REDIS_PASSWORD via the rendered Secret.
+    redisPasswordFromSecret: true
+  # OPA external-authorization sidecar.
+  opa:
+    enabled: true
+    image: openpolicyagent/opa:0.70.0-rootless
+    port: 8181
+    # Decision the Kong opa plugin queries.
+    decisionPath: /v1/data/ancora/authz/allow
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# Rego policy loaded by the OPA sidecar. Enforces that authenticated requests
+# carry a tenant identity and that the API version is supported. Override with
+# your production authorization model.
+opaPolicy: |
+  package ancora.authz
+
+  import future.keywords.if
+  import future.keywords.in
+
+  default allow := false
+
+  # Public operational and health surface is always reachable.
+  allow if {
+    input.attributes.request.http.path in {"/health", "/ready", "/metrics", "/version"}
+  }
+
+  # Authenticated business calls must carry a resolved tenant and a supported
+  # API version. Kong's jwt + request-transformer plugins populate these
+  # headers upstream of the OPA check.
+  allow if {
+    input.attributes.request.http.headers["x-tenant-id"] != ""
+    input.attributes.request.http.headers["x-api-version"] == "v1"
+  }

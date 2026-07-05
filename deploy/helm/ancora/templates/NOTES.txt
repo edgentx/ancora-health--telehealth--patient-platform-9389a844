@@ -1,0 +1,33 @@
+Ancora Health platform deployed to namespace "{{ include "ancora.namespace" . }}".
+
+Components:
+{{- range $name, $c := .Values.components }}
+{{- if $c.enabled }}
+  - {{ $name }} ({{ $c.replicas }} replica{{ if ne (int $c.replicas) 1 }}s{{ end }}, image target "{{ $c.imageTarget }}")
+{{- end }}
+{{- end }}
+
+Edge:
+  App host: https://{{ .Values.ingress.hosts.app }}
+  WS host:  https://{{ .Values.ingress.hosts.ws }}
+{{- if .Values.ingress.certManager.enabled }}
+  TLS:      cert-manager {{ .Values.ingress.certManager.issuerKind }}/{{ .Values.ingress.certManager.issuer }} -> secret {{ .Values.ingress.tls.secretName }}
+{{- end }}
+{{- if .Values.kong.enabled }}
+  Kong:     jwt, cors, request-transformer (tenant + version), rate-limiting ({{ .Values.kong.rateLimiting.policy }}), opa
+{{- end }}
+
+Verify rollout:
+  kubectl -n {{ include "ancora.namespace" . }} rollout status deploy/{{ include "ancora.fullname" . }}-api
+  kubectl -n {{ include "ancora.namespace" . }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+{{- if not .Values.secrets.existingSecret }}
+{{- $missing := false }}
+{{- if not .Values.secrets.data.MONGODB_URI }}{{ $missing = true }}{{ end }}
+{{- if $missing }}
+
+WARNING: MONGODB_URI (and possibly other secrets) is empty. The platform boots
+with in-memory fallbacks, but production requires real secret material. Supply
+it via --set-file, sealed-secrets, or secrets.existingSecret.
+{{- end }}
+{{- end }}

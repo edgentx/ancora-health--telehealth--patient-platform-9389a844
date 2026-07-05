@@ -1,0 +1,124 @@
+{{- $root := . -}}
+{{- range $name, $component := .Values.components }}
+{{- if $component.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ancora.fullname" $root }}-{{ $name }}
+  namespace: {{ include "ancora.namespace" $root }}
+  labels:
+    {{- include "ancora.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $component.replicas }}
+  selector:
+    matchLabels:
+      {{- include "ancora.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ancora.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+      annotations:
+        # Roll pods when the non-secret config changes.
+        checksum/config: {{ include (print $root.Template.BasePath "/configmap.yaml") $root | sha256sum }}
+        {{- if $root.Values.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: {{ $root.Values.metrics.path | quote }}
+        prometheus.io/port: {{ $component.containerPort | quote }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "ancora.serviceAccountName" $root }}
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "ancora.image" (dict "root" $root "target" $component.imageTarget) }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          {{- with $component.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: {{ $root.Values.metrics.portName }}
+              containerPort: {{ $component.containerPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ $component.containerPort | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "ancora.configMapName" $root }}
+            - secretRef:
+                name: {{ include "ancora.secretName" $root }}
+          livenessProbe:
+            httpGet:
+              path: {{ $root.Values.probes.liveness.path }}
+              port: {{ $root.Values.metrics.portName }}
+            initialDelaySeconds: {{ $root.Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ $root.Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ $root.Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ $root.Values.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ $root.Values.probes.readiness.path }}
+              port: {{ $root.Values.metrics.portName }}
+            initialDelaySeconds: {{ $root.Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ $root.Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ $root.Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ $root.Values.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml (default $root.Values.resources $component.resources) | nindent 12 }}
+          securityContext:
+            {{- toYaml $root.Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            # Read-only rootfs: give the process a writable scratch dir for /tmp.
+            - name: tmp
+              mountPath: /tmp
+        {{- if and $component.opa $component.opa.enabled $root.Values.kong.enabled $root.Values.kong.opa.enabled }}
+        # OPA sidecar: edge authorization decisions for this component, loading
+        # the Rego policy from the shared ConfigMap. Kong's opa plugin queries
+        # it at localhost:{{ $root.Values.kong.opa.port }}.
+        - name: opa
+          image: {{ $root.Values.kong.opa.image }}
+          args:
+            - run
+            - --server
+            - --addr=0.0.0.0:{{ $root.Values.kong.opa.port }}
+            - --log-level=info
+            - /policies/policy.rego
+          ports:
+            - name: opa
+              containerPort: {{ $root.Values.kong.opa.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health?bundle=false
+              port: opa
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml $root.Values.kong.opa.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $root.Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: opa-policy
+              mountPath: /policies
+              readOnly: true
+        {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if and $component.opa $component.opa.enabled $root.Values.kong.enabled $root.Values.kong.opa.enabled }}
+        - name: opa-policy
+          configMap:
+            name: {{ include "ancora.fullname" $root }}-opa-policy
+        {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,21 @@
+apiVersion: v2
+name: ancora
+description: >-
+  Ancora Health telehealth platform — API, realtime WebSocket gateway, and
+  Temporal worker, fronted by an NGINX Ingress with cert-manager TLS and a
+  Kong + OPA policy edge (JWT, tenant header injection, CORS, versioning, and
+  Redis-backed rate limiting). Deploys into a dedicated namespace on the
+  VForce360 MicroK8s cluster.
+type: application
+# Chart version tracks the packaging; appVersion tracks the platform image tag.
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.24.0-0"
+keywords:
+  - telehealth
+  - ancora
+  - kong
+  - opa
+home: https://github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844
+maintainers:
+  - name: Ancora Platform

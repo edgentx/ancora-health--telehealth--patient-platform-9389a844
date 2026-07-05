@@ -1,0 +1,30 @@
+{{- $root := . -}}
+{{- range $name, $component := .Values.components }}
+{{- if and $component.enabled $component.service $component.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ancora.fullname" $root }}-{{ $name }}
+  namespace: {{ include "ancora.namespace" $root }}
+  labels:
+    {{- include "ancora.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  {{- if $root.Values.metrics.enabled }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: {{ $root.Values.metrics.path | quote }}
+    prometheus.io/port: {{ $component.containerPort | quote }}
+  {{- end }}
+spec:
+  type: {{ default "ClusterIP" $component.service.type }}
+  selector:
+    {{- include "ancora.selectorLabels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: {{ $root.Values.metrics.portName }}
+      port: {{ $component.service.port }}
+      targetPort: {{ $root.Values.metrics.portName }}
+      protocol: TCP
+{{- end }}
+{{- end }}
