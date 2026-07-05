@@ -1,0 +1,95 @@
+name: CI
+
+# S-78 — Pull-request CI pipeline. Adds the two surfaces the earlier gates did
+# not cover:
+#   * frontend: Next.js lint, type-check, unit tests (vitest) and a production
+#     build, and
+#   * backend coverage: the module-wide unit coverage floor.
+# It runs alongside the Domain Gate (domain-gate.yml — BDD scenarios green) and
+# the API Integration Suite (integration.yml — integration flows + coverage
+# floor). Together these are the required checks for a PR into main; see
+# docs/pipeline.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref so a fast follow-up push does not queue
+# behind a stale one.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-coverage:
+    name: Go unit tests + coverage floor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # setup-go caches the module and build cache keyed on go.sum by default.
+          go-version: '1.24'
+
+      - name: gofmt (formatting is a build failure)
+        run: |
+          unformatted="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"; echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Unit tests with coverage gate
+        run: make coverage
+
+      - name: Upload unit coverage profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: coverage.unit.out
+          if-no-files-found: warn
+
+  frontend:
+    name: Frontend lint, type-check, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # Cache the npm download cache keyed on the frontend lockfile.
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build

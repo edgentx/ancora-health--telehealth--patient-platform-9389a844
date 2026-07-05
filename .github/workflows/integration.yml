@@ -46,13 +46,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          # Must satisfy the go.mod `go 1.24.0` directive; caching is on by
+          # default (keyed on go.sum) so module downloads are reused across runs.
+          go-version: '1.24'
 
       - name: Integration suite with coverage (live MongoDB + Redis)
         env:
           MONGODB_URI: mongodb://localhost:27017
           ANCO_REDIS_ADDR: localhost:6379
         run: make integration
+
+      - name: Enforce integration coverage floor
+        run: make cov-check PROFILE=coverage.integration.out COVERAGE_MIN=30
 
       - name: Upload coverage profile
         if: always()

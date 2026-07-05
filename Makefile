@@ -1,4 +1,6 @@
-.PHONY: build test lint gate docker docker-api docker-realtime docker-worker scan integration integration-docker
+.PHONY: build test lint gate coverage cov-check sast scan-deps \
+	docker docker-api docker-realtime docker-worker docker-web scan \
+	integration integration-docker
 
 build:
 	go build ./...
@@ -29,6 +31,12 @@ docker-realtime:
 docker-worker:
 	docker build $(BUILD_ARGS) --target worker   -t $(IMAGE)-worker:$(VERSION)   -t $(IMAGE)-worker:latest .
 
+# Frontend image (S-78). The Next.js standalone build under web/ ships as its own
+# distroless/non-root image alongside the three backend targets.
+WEB_IMAGE ?= ancora/web
+docker-web:
+	docker build -t $(WEB_IMAGE):$(VERSION) -t $(WEB_IMAGE):latest web
+
 # Fail the build on any HIGH/CRITICAL finding. Documented waivers live in
 # .trivyignore. Requires trivy (https://trivy.dev) on PATH.
 scan: docker-api
@@ -41,6 +49,41 @@ gate:
 	go build ./...
 	go vet ./...
 	go test ./...
+
+# --- Coverage gates (S-78) ---
+# The PR pipeline fails below a coverage floor. Thresholds are variables so they
+# can be raised over time (or overridden per-run) without editing recipes.
+COVERAGE_MIN             ?= 30
+INTEGRATION_COVERAGE_MIN ?= 30
+
+# coverage — module-wide unit coverage gate. Runs the full unit suite with a
+# coverage profile, prints the total, and fails if it is under COVERAGE_MIN.
+coverage:
+	go test -covermode=atomic -coverprofile=coverage.unit.out ./...
+	@$(MAKE) --no-print-directory cov-check PROFILE=coverage.unit.out COVERAGE_MIN=$(COVERAGE_MIN)
+
+# cov-check — reusable floor check over an existing coverprofile. Usage:
+#   make cov-check PROFILE=coverage.integration.out COVERAGE_MIN=30
+cov-check:
+	@total=$$(go tool cover -func=$(PROFILE) | awk '/^total:/ {gsub(/%/,"",$$3); print $$3}'); \
+	echo "coverage($(PROFILE)) = $$total%  (floor $(COVERAGE_MIN)%)"; \
+	awk -v t="$$total" -v m="$(COVERAGE_MIN)" 'BEGIN { exit (t+0 < m+0) }' || { \
+		echo "FAIL: coverage $$total% is below the $(COVERAGE_MIN)% threshold"; exit 1; }
+
+# --- Security scanning (S-78) ---
+# sast — basic static analysis over the Go source with gosec. Findings at or
+# above medium severity/confidence fail the build; waive a checked line inline
+# with a justified `#nosec Gxxx -- reason` comment. Requires gosec on PATH.
+sast:
+	gosec -quiet -severity medium -confidence medium -exclude-dir=web ./...
+
+# scan-deps — dependency vulnerability scan: Go modules + stdlib via govulncheck
+# (reports only vulns actually reachable from the code) and the filesystem
+# manifests (go.sum, package-lock.json) via Trivy, failing on HIGH/CRITICAL.
+# Documented waivers live in .trivyignore. Requires govulncheck and trivy.
+scan-deps:
+	govulncheck ./...
+	trivy fs --severity HIGH,CRITICAL --ignorefile .trivyignore --exit-code 1 --scanners vuln .
 
 # integration — S-75 API-level integration suite. Boots the HTTP server over the
 # real repositories and stubbed external adapters and drives representative flows
