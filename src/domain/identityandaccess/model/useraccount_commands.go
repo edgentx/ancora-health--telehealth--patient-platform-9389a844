@@ -30,6 +30,15 @@ type AuthenticateUserCmd struct {
 	MfaCode string
 }
 
+// InitiatePasswordResetCmd requests that a UserAccount begin a password reset by
+// issuing a single-use reset token. It carries the login email the reset was
+// requested for; the handler enforces the account invariants and, on success,
+// emits user.password.reset.requested with a freshly minted, unexpired token.
+type InitiatePasswordResetCmd struct {
+	// Email is the login email the password reset was requested for.
+	Email string
+}
+
 // LockAccountCmd requests that a UserAccount be locked, typically after its
 // failed-attempt threshold is crossed by credential-stuffing protection. It
 // carries the identity of the account to lock and the reason the lock is being

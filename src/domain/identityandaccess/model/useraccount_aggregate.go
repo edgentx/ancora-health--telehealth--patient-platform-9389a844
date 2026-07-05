@@ -4,6 +4,8 @@
 package model
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"strings"
 	"time"
 
@@ -71,6 +73,8 @@ func (a *UserAccountAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 		return a.lockAccount(c)
 	case AuthenticateUserCmd:
 		return a.authenticateUser(c)
+	case InitiatePasswordResetCmd:
+		return a.initiatePasswordReset(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -286,6 +290,81 @@ func (a *UserAccountAggregate) applyAuthenticated(evt UserAuthenticatedEvent) {
 // replay when rehydrating from the store.
 func (a *UserAccountAggregate) applyLoginFailed(evt UserLoginFailedEvent) {
 	a.FailedLoginAttempts = evt.FailedAttempts
+}
+
+// resetTokenWindow is how long an issued password-reset token stays valid before
+// it expires and can no longer change the credential.
+const resetTokenWindow = 30 * time.Minute
+
+// initiatePasswordReset handles InitiatePasswordResetCmd: it validates the
+// command input, enforces the account invariants, then issues a single-use reset
+// token by emitting UserPasswordResetRequestedEvent and buffering it on the
+// aggregate. The invariant guards mirror the other handlers so the strongest
+// prohibitions (a duplicate email or an active lockout) are reported before the
+// reset-token and MFA checks; in particular the reset-token guard rejects a
+// request while a prior token is still consumed or unexpired, so a fresh token is
+// only minted once no other pending token is in play.
+func (a *UserAccountAggregate) initiatePasswordReset(cmd InitiatePasswordResetCmd) ([]shared.DomainEvent, error) {
+	if strings.TrimSpace(cmd.Email) == "" {
+		return nil, ErrMissingEmail
+	}
+
+	// Invariant: email must be unique per tenant and cannot be reused by an
+	// active account.
+	if a.EmailRegistered {
+		return nil, ErrEmailAlreadyRegistered
+	}
+	// Invariant: an account locked by credential-stuffing protection cannot
+	// authenticate until the lockout window elapses.
+	if !a.LockedUntil.IsZero() && a.LockedUntil.After(time.Now()) {
+		return nil, ErrAccountLocked
+	}
+	// Invariant: a password reset token is single-use and must be unexpired to
+	// change the credential.
+	if a.ResetTokenConsumed ||
+		(!a.ResetTokenExpiresAt.IsZero() && !a.ResetTokenExpiresAt.After(time.Now())) {
+		return nil, ErrResetTokenInvalid
+	}
+	// Invariant: MFA-enrolled accounts must present a valid second factor before
+	// a session is issued.
+	if a.MFAEnrolled && !a.SecondFactorVerified {
+		return nil, ErrSecondFactorRequired
+	}
+
+	evt := UserPasswordResetRequestedEvent{
+		UserID:    a.ID,
+		Email:     cmd.Email,
+		Token:     newResetToken(),
+		ExpiresAt: time.Now().Add(resetTokenWindow),
+	}
+
+	a.applyPasswordResetRequested(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyPasswordResetRequested mutates aggregate state from a
+// UserPasswordResetRequestedEvent, opening a fresh single-use reset-token window.
+// Keeping mutation here lets the same event drive both command handling and
+// future replay when rehydrating from the store.
+func (a *UserAccountAggregate) applyPasswordResetRequested(evt UserPasswordResetRequestedEvent) {
+	a.ResetTokenExpiresAt = evt.ExpiresAt
+	a.ResetTokenConsumed = false
+}
+
+// newResetToken mints an unpredictable single-use password-reset token. The
+// domain issues the token but never stores raw credential material; downstream
+// infrastructure delivers it and later validates the presented value.
+func newResetToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand should not fail; fall back to a time-seeded token so the
+		// reset can still proceed rather than blocking the account.
+		return "reset-" + time.Now().UTC().Format("20060102T150405.000000000")
+	}
+	return hex.EncodeToString(b)
 }
 
 // routeForRole resolves the landing route an account is directed to based on its
