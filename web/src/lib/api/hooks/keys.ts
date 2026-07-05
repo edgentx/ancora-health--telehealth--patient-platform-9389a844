@@ -15,6 +15,7 @@ export const queryKeys = {
     root: ['scheduling'] as const,
     appointments: () => [...queryKeys.scheduling.root, 'appointments'] as const,
     appointment: (id: Id) => [...queryKeys.scheduling.appointments(), id] as const,
+    providers: () => [...queryKeys.scheduling.root, 'providers'] as const,
     providerSchedule: (providerId: Id) =>
       [...queryKeys.scheduling.root, 'provider-schedule', providerId] as const,
   },
@@ -32,6 +33,8 @@ export const queryKeys = {
     messages: (threadId: Id) =>
       [...queryKeys.engagement.root, 'messages', threadId] as const,
     notifications: () => [...queryKeys.engagement.root, 'notifications'] as const,
+    prescriptions: () => [...queryKeys.engagement.root, 'prescriptions'] as const,
+    intake: () => [...queryKeys.engagement.root, 'intake'] as const,
   },
   billing: {
     root: ['billing'] as const,
