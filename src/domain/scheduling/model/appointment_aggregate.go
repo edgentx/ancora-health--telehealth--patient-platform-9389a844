@@ -15,6 +15,9 @@ const (
 	// AppointmentStatusHeld is an appointment holding a hold lock over a slot that
 	// must be confirmed before the lock expires or it is released.
 	AppointmentStatusHeld AppointmentStatus = "held"
+	// AppointmentStatusBooked is an appointment whose held slot has been confirmed
+	// into a committed booking by BookAppointmentCmd.
+	AppointmentStatusBooked AppointmentStatus = "booked"
 )
 
 // AppointmentAggregate is the scheduling Appointment aggregate. It embeds
@@ -77,6 +80,8 @@ func (a *AppointmentAggregate) Execute(cmd interface{}) ([]shared.DomainEvent, e
 		return a.rescheduleAppointment(c)
 	case RegisterWalkInCmd:
 		return a.registerWalkIn(c)
+	case BookAppointmentCmd:
+		return a.bookAppointment(c)
 	default:
 		return nil, shared.ErrUnknownCommand
 	}
@@ -299,5 +304,79 @@ func (a *AppointmentAggregate) applyRescheduled(evt AppointmentRescheduledEvent)
 func (a *AppointmentAggregate) applyWalkInRegistered(evt AppointmentWalkInRegisteredEvent) {
 	a.Status = AppointmentStatusHeld
 	a.ScopedProviderID = evt.ProviderID
+	a.ScopedPatientID = evt.PatientID
+}
+
+// bookAppointment handles BookAppointmentCmd: it validates the command input,
+// enforces the scheduling invariants, then emits an AppointmentBookedEvent and
+// buffers it on the aggregate. Booking confirms the hold lock acquired by
+// HoldSlotCmd into a committed appointment, so the same guards that gate the
+// hold gate the confirmation.
+//
+// The guards enforce, in order:
+//
+//   - Completeness: the hold token, patient and reason must all be present.
+//   - Provider availability: the slot must fall within the provider's published
+//     availability.
+//   - Double-booking: a slot may be booked by at most one appointment at a time.
+//   - Hold-lock expiry: the hold lock being confirmed must still be live; a lock
+//     that expired without confirmation and was not released cannot be booked.
+//   - Policy window: booking activity is only permitted within the configured
+//     policy window.
+func (a *AppointmentAggregate) bookAppointment(cmd BookAppointmentCmd) ([]shared.DomainEvent, error) {
+	if cmd.HoldToken == "" {
+		return nil, ErrMissingHoldToken
+	}
+	if cmd.PatientId == "" {
+		return nil, ErrMissingPatient
+	}
+	if cmd.Reason == "" {
+		return nil, ErrMissingReason
+	}
+
+	// Invariant: an appointment cannot be booked outside the provider's published
+	// availability.
+	if a.SlotOutsideAvailability {
+		return nil, ErrSlotOutsideAvailability
+	}
+
+	// Invariant: a slot may be booked by at most one appointment at a time — the
+	// slot must not already be claimed by another appointment.
+	if a.SlotAlreadyBooked {
+		return nil, ErrSlotDoubleBooked
+	}
+
+	// Invariant: a held slot must be confirmed before its hold lock expires or it
+	// is released; an expired-but-unreleased lock cannot be booked.
+	if a.HoldLockExpired {
+		return nil, ErrHoldLockExpired
+	}
+
+	// Invariant: reschedule and cancel are only permitted within the configured
+	// policy window.
+	if a.OutsidePolicyWindow {
+		return nil, ErrOutsidePolicyWindow
+	}
+
+	evt := AppointmentBookedEvent{
+		AppointmentID: a.ID,
+		HoldToken:     cmd.HoldToken,
+		PatientID:     cmd.PatientId,
+		Reason:        cmd.Reason,
+	}
+
+	a.applyBooked(evt)
+	a.AddEvent(evt)
+	a.Version++
+
+	return []shared.DomainEvent{evt}, nil
+}
+
+// applyBooked mutates aggregate state from an AppointmentBookedEvent. It promotes
+// the appointment into the booked state and records the patient the booking was
+// confirmed for, mirroring apply as the single mutation point for the booked
+// event during both command handling and replay.
+func (a *AppointmentAggregate) applyBooked(evt AppointmentBookedEvent) {
+	a.Status = AppointmentStatusBooked
 	a.ScopedPatientID = evt.PatientID
 }
