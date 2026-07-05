@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
@@ -8,6 +9,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+// recordAudit appends a compliance entry through sink when one is wired. It
+// returns any error the sink reports, so a flow that must produce an audit entry
+// (a clinical, prescribing, or billing action) surfaces a broken chain as a 500
+// rather than passing silently. A nil sink is a clean no-op, which is what lets
+// the handler unit suite run without an audit backend.
+func recordAudit(ctx context.Context, sink AuditSink, actor, resourceRef, action string) error {
+	if sink == nil {
+		return nil
+	}
+	return sink.Record(ctx, actor, resourceRef, action)
+}
 
 // newID mints a fresh aggregate identity as "<prefix>_<16 random hex bytes>".
 // Identities are minted server-side rather than accepted from the client so a

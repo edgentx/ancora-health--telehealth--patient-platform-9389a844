@@ -14,7 +14,18 @@ import (
 	clinicalrepo "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/clinicalrecords/repository"
 	engagementrepo "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/patientengagement/repository"
 	schedulingrepo "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/scheduling/repository"
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/integration/payment"
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/integration/pharmacy"
 )
+
+// AuditSink is the narrow recording seam mutating handlers append a compliance
+// entry through after a successful command. It is deliberately minimal — one
+// method taking references, never PHI — so any sink (the audit hash chain, a
+// SIEM shipper, a test spy) can satisfy it. A nil sink makes recording a no-op,
+// which is what keeps the handler unit suite free of an audit dependency.
+type AuditSink interface {
+	Record(ctx context.Context, actor, resourceRef, action string) error
+}
 
 // APIVersion is the single version segment every business route is mounted
 // under. Bumping it (and mounting a second tree) is how a breaking API revision
@@ -45,6 +56,37 @@ type Dependencies struct {
 	InsurancePolicies billingrepo.InsurancePolicyRepository
 	ClinicDirectories adminrepo.ClinicDirectoryRepository
 	AuditTrails       auditrepo.AuditTrailRepository
+
+	// The fields below extend the surface with the cross-context flows the S-72
+	// adapters and the remaining aggregates back. Each is optional: a nil
+	// repository leaves its routes unmounted, so a caller (or a focused test)
+	// wires only the contexts it exercises. main and the integration suite wire
+	// them all.
+
+	// Encounters backs the clinical encounter-documentation flow.
+	Encounters clinicalrepo.EncounterRepository
+	// Invoices and Payments back the billing invoice+payment flow. Payment
+	// reconciliation additionally flows through the gateway webhook below.
+	Invoices billingrepo.InvoiceRepository
+	Payments billingrepo.PaymentRepository
+
+	// Pharmacy is the outbound e-prescribing gateway a prescription is
+	// transmitted through. When set, POST …/transmission submits to it (which
+	// audits the outbound PHI access); when nil, transmission is a domain-only
+	// state advance.
+	Pharmacy pharmacy.PharmacyGateway
+
+	// PaymentWebhookSecret is the shared HMAC secret the gateway signs webhooks
+	// with. When set together with Payments, POST /payment-webhooks is mounted:
+	// it verifies the signature and reconciles the payment. PaymentIdempotency
+	// makes a redelivered webhook a no-op; a nil store falls back to an in-memory
+	// one.
+	PaymentWebhookSecret []byte
+	PaymentIdempotency   payment.IdempotencyStore
+
+	// Audit is the compliance sink mutating flows append an entry through. When
+	// nil, recording is skipped.
+	Audit AuditSink
 }
 
 // NewRouter builds the versioned chi router: shared middleware, the operational
@@ -75,10 +117,26 @@ func NewRouter(deps Dependencies) http.Handler {
 		api.Route("/api/"+APIVersion, func(v1 chi.Router) {
 			schedulingAPI{appointments: deps.Appointments, schedules: deps.ProviderSchedules}.mount(v1)
 			clinicalAPI{labOrders: deps.LabOrders}.mount(v1)
-			engagementAPI{prescriptions: deps.Prescriptions}.mount(v1)
+			engagementAPI{prescriptions: deps.Prescriptions, pharmacy: deps.Pharmacy}.mount(v1)
 			billingAPI{policies: deps.InsurancePolicies}.mount(v1)
 			adminAPI{directories: deps.ClinicDirectories}.mount(v1)
 			auditAPI{trails: deps.AuditTrails}.mount(v1)
+
+			// Optional cross-context flows: mounted only when their backing
+			// aggregate repository is wired, so a partial deployment (or a focused
+			// test) exposes exactly the contexts it configured.
+			if deps.Encounters != nil {
+				encounterAPI{encounters: deps.Encounters, audit: deps.Audit}.mount(v1)
+			}
+			if deps.Invoices != nil || deps.Payments != nil {
+				billingFlowAPI{
+					invoices:       deps.Invoices,
+					payments:       deps.Payments,
+					audit:          deps.Audit,
+					webhookSecret:  deps.PaymentWebhookSecret,
+					webhookIdempot: deps.PaymentIdempotency,
+				}.mount(v1)
+			}
 		})
 	})
 
