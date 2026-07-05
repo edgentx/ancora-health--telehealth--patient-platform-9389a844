@@ -16,6 +16,7 @@ import (
 	schedulingrepo "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/domain/scheduling/repository"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/integration/payment"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/integration/pharmacy"
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/platform"
 )
 
 // AuditSink is the narrow recording seam mutating handlers append a compliance
@@ -108,6 +109,9 @@ func NewRouter(deps Dependencies) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	r.Get("/ready", deps.handleReady)
+	r.Get("/version", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, platform.Build())
+	})
 
 	// Business surface — versioned, traced, and identity-aware.
 	r.Group(func(api chi.Router) {
