@@ -58,6 +58,21 @@ func TestInitiatePasswordResetEmitsRequestedEvent(t *testing.T) {
 	}
 }
 
+func TestInitiatePasswordResetAllowsExpiredPriorToken(t *testing.T) {
+	aggregate := &UserAccountAggregate{
+		ID:                  "user-123",
+		ResetTokenExpiresAt: time.Now().Add(-time.Minute),
+	}
+
+	events, err := aggregate.Execute(InitiatePasswordResetCmd{Email: "patient@example.com"})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("Execute() emitted %d events, want 1", len(events))
+	}
+}
+
 func TestInitiatePasswordResetRejectsInvariantViolations(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -89,10 +104,10 @@ func TestInitiatePasswordResetRejectsInvariantViolations(t *testing.T) {
 			wantErr: ErrResetTokenInvalid,
 		},
 		{
-			name: "reset token expired",
+			name: "reset token still unexpired",
 			aggregate: UserAccountAggregate{
 				ID:                  "user-123",
-				ResetTokenExpiresAt: time.Now().Add(-time.Minute),
+				ResetTokenExpiresAt: time.Now().Add(time.Minute),
 			},
 			wantErr: ErrResetTokenInvalid,
 		},
