@@ -1,4 +1,4 @@
-.PHONY: build test lint gate integration integration-docker
+.PHONY: build test lint gate docker docker-api docker-realtime docker-worker scan integration integration-docker
 
 build:
 	go build ./...
@@ -8,6 +8,31 @@ test:
 
 lint:
 	go vet ./...
+
+# --- Container build + scan (S-76) ---
+# Image coordinates and the build metadata stamped into every image via ldflags.
+IMAGE   ?= ancora/backend
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+BUILD_ARGS = --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg BUILD_DATE=$(DATE)
+
+# Build all three entrypoint images (api is the default target).
+docker: docker-api docker-realtime docker-worker
+
+docker-api:
+	docker build $(BUILD_ARGS) --target api      -t $(IMAGE)-api:$(VERSION)      -t $(IMAGE)-api:latest .
+
+docker-realtime:
+	docker build $(BUILD_ARGS) --target realtime -t $(IMAGE)-realtime:$(VERSION) -t $(IMAGE)-realtime:latest .
+
+docker-worker:
+	docker build $(BUILD_ARGS) --target worker   -t $(IMAGE)-worker:$(VERSION)   -t $(IMAGE)-worker:latest .
+
+# Fail the build on any HIGH/CRITICAL finding. Documented waivers live in
+# .trivyignore. Requires trivy (https://trivy.dev) on PATH.
+scan: docker-api
+	trivy image --severity HIGH,CRITICAL --ignorefile .trivyignore --exit-code 1 $(IMAGE)-api:$(VERSION)
 
 # gate — S-67 domain gate. Verifies the whole module builds and every domain
 # behavior (BDD) scenario under src/domain/**/model passes with zero failures.

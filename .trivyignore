@@ -1,0 +1,16 @@
+# Trivy vulnerability waivers for the Ancora Health backend image (S-76).
+#
+# Policy: the image must scan clean of HIGH/CRITICAL findings. The runtime stage
+# is gcr.io/distroless/static-debian12:nonroot — it carries only the static Go
+# binary, ca-certificates, tzdata and /etc/passwd, so the OS-package attack
+# surface is essentially nil. Remaining findings, if any, come from Go module
+# dependencies and are fixed by bumping the module (go get -u) — prefer a fix
+# over a waiver.
+#
+# Add a waiver ONLY with: the CVE id, the affected module, why it is not
+# exploitable in this image, and a review date. An unexplained id here is a bug.
+#
+# Format: one CVE id per line (optionally `CVE-ID exp:YYYY-MM-DD`).
+#
+# --- Active waivers ---
+# (none — the image currently scans clean; see docs/container.md for how to scan)

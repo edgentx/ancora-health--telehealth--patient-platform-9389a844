@@ -1,21 +1,32 @@
-// Command worker is the deployable Temporal worker process. It hosts the
-// durable workflows and activities for appointment reminders, results-ready
-// notifications, the billing/eligibility saga, and the scheduled analytics
-// rollups, registering them on the configured task queue and connecting with
-// deploy-time Temporal config.
+// Command worker is the deployable background-processing entrypoint for the
+// Ancora Health platform. It hosts the durable Temporal workflows and activities
+// for appointment reminders, results-ready notifications, the billing/eligibility
+// saga, and the scheduled analytics rollups (S-74), and it is one of the three
+// selectable backend entrypoints the container image builds — api, realtime,
+// worker (S-76).
 //
-// It is a separate process from cmd/server: the API server serves HTTP while
-// this process polls Temporal. Both share the same repositories and adapters, so
-// wiring mirrors the server's graceful-degradation style — it binds MongoDB and
-// the external gateways when configured and falls back to in-memory doubles for
-// local runs, so the worker is always launchable.
+// Alongside the Temporal worker it serves the standard operational surface
+// (/health, /ready, /metrics, /version) so the container has a readiness probe
+// and a metrics scrape regardless of which entrypoint the image runs, and it
+// accepts the `-healthcheck` self-probe the distroless HEALTHCHECK invokes.
+//
+// It is a separate process from cmd/server: the API server serves business HTTP
+// while this process polls Temporal. Both share the same repositories and
+// adapters, so wiring mirrors the server's graceful-degradation style — it binds
+// MongoDB and the external gateways when configured and falls back to in-memory
+// doubles for local runs. The ops surface comes up even when no Temporal frontend
+// is reachable, which is what lets the container start and pass its readiness
+// probe locally.
 package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	temporalapp "github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/application/temporal"
@@ -26,19 +37,48 @@ import (
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/locking"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/persistence/mongodb"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/pubsub"
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/platform"
 )
 
 func main() {
-	ctx := context.Background()
+	// -healthcheck is the container HEALTHCHECK entrypoint: probe /ready on the
+	// local listen address and exit non-zero if the service is not serving, so
+	// the distroless runtime image needs no shell or curl to be health-checked.
+	healthcheck := flag.Bool("healthcheck", false, "probe /ready on the local listen address and exit")
+	flag.Parse()
+	if *healthcheck {
+		if err := platform.SelfCheck(); err != nil {
+			log.Fatalf("healthcheck failed: %v", err)
+		}
+		return
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	activities := buildActivities(ctx)
 	cfg := temporalapp.ConfigFromEnv()
 
-	log.Printf("temporal worker: task queue %q, namespace %q, host %q",
-		cfg.TaskQueue, cfg.Namespace, cfg.HostPort)
+	// Host the Temporal worker off the request path, in a goroutine, so the ops
+	// server can serve /metrics and /ready in parallel. Sharing the process this
+	// way means the container reports health and metrics whether or not a Temporal
+	// frontend is reachable: a dial failure (e.g. no Temporal locally) is logged
+	// and the ops surface stays up rather than crashing the container.
+	go func() {
+		log.Printf("temporal worker: task queue %q, namespace %q, host %q",
+			cfg.TaskQueue, cfg.Namespace, cfg.HostPort)
+		if err := temporalapp.Run(cfg, activities); err != nil {
+			log.Printf("temporal worker: not running (%v); ops surface still served", err)
+		}
+	}()
 
-	if err := temporalapp.Run(cfg, activities); err != nil {
-		log.Fatalf("temporal worker: %v", err)
+	// Dependency-free readiness: the worker has no request-serving backing store,
+	// so /ready reports 200 once the process is up (mirroring the realtime gateway).
+	mux := platform.NewOpsMux(platform.NewMetricsRegistry(), nil)
+	addr := platform.ListenAddr()
+	platform.LogStartup("ancora-worker", addr)
+	if err := platform.Serve(ctx, addr, mux); err != nil {
+		log.Fatalf("worker error: %v", err)
 	}
 }
 

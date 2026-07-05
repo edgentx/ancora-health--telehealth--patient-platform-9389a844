@@ -1,0 +1,41 @@
+# Keep the build context small and the image reproducible: ship only what the
+# Go build needs. Everything here is either irrelevant to the backend binary or
+# would bust the module-download cache layer for no reason.
+
+# VCS + CI
+.git
+.github
+.gitignore
+
+# Docs / project meta
+README.md
+docs
+*.md
+
+# Frontend + design assets (not part of the Go backend image)
+web
+design-system
+
+# Python tooling (unrelated to the Go services)
+__pycache__
+*.pyc
+.venv
+*.egg-info
+
+# Node
+node_modules
+.next
+
+# Local build output + editor cruft
+/bin
+.idea
+.vscode
+*.swp
+
+# Environment / secrets — must never enter an image layer
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

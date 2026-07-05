@@ -8,15 +8,18 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"flag"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/audit"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/crypto"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/locking"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/infrastructure/persistence/mongodb"
 	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/interfaces/rest"
+	"github.com/edgentx/ancora-health--telehealth--patient-platform-9389a844/src/platform"
 )
 
 // envMasterKey names the hex-encoded 32-byte master key that seals PHI at rest.
@@ -105,11 +108,26 @@ func masterKey() []byte {
 }
 
 func main() {
-	deps := buildContainer(context.Background())
+	// -healthcheck is the container HEALTHCHECK entrypoint: probe /ready on the
+	// local listen address and exit non-zero if the service is not serving, so
+	// the runtime image needs no shell or curl to be health-checked.
+	healthcheck := flag.Bool("healthcheck", false, "probe /ready on the local listen address and exit")
+	flag.Parse()
+	if *healthcheck {
+		if err := platform.SelfCheck(); err != nil {
+			log.Fatalf("healthcheck failed: %v", err)
+		}
+		return
+	}
 
-	const addr = ":8000"
-	log.Printf("Ancora Health — Telehealth & Patient Platform listening on %s", addr)
-	if err := http.ListenAndServe(addr, rest.NewRouter(deps)); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	deps := buildContainer(ctx)
+
+	addr := platform.ListenAddr()
+	platform.LogStartup("ancora-api", addr)
+	if err := platform.Serve(ctx, addr, rest.NewRouter(deps)); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
