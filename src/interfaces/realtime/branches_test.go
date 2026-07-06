@@ -212,7 +212,9 @@ func TestHandle_EmptyBodyFrameIsSkipped(t *testing.T) {
 
 	conn := newFakeConn()
 	ctx := context.Background()
-	go func() { _ = gw.Handle(ctx, conn, Handshake{UserID: "patient-1", Role: "patient", ThreadID: "thread-1"}) }()
+	go func() {
+		_ = gw.Handle(ctx, conn, Handshake{UserID: "patient-1", Role: "patient", ThreadID: "thread-1"})
+	}()
 
 	select {
 	case <-broker.subscribed:
