@@ -1,4 +1,4 @@
-.PHONY: build test lint gate coverage cov-check sast scan-deps \
+.PHONY: build test lint gate coverage cov-check ensure-covdata sast scan-deps \
 	docker docker-api docker-realtime docker-worker docker-web scan \
 	integration integration-docker
 
@@ -63,11 +63,21 @@ INTEGRATION_COVERAGE_MIN ?= 30
 # in the active toolchain. Some downloaded toolchains ship without it; under
 # `-coverprofile` every package that has no test files then fails to emit its
 # zero-coverage entry and drops out of coverage.unit.out entirely, INFLATING the
-# local total so it no longer matches CI. If a local number disagrees with CI,
-# build the tool first:  go build -o "$(shell go env GOROOT)/pkg/tool/$(shell go env GOOS)_$(shell go env GOARCH)/covdata" cmd/covdata
-coverage:
+# local total so it no longer matches CI. The `ensure-covdata` prerequisite below
+# builds the tool on demand so this target is self-healing on such toolchains.
+coverage: ensure-covdata
 	go test -covermode=atomic -coverprofile=coverage.unit.out ./...
 	@$(MAKE) --no-print-directory cov-check PROFILE=coverage.unit.out COVERAGE_MIN=$(COVERAGE_MIN)
+
+# ensure-covdata — guarantee the `covdata` tool exists in the active toolchain so
+# coverage instrumentation can emit zero-coverage entries for no-test packages and
+# the reported total matches CI. No-op when the tool is already present.
+ensure-covdata:
+	@tooldir="$$(go env GOROOT)/pkg/tool/$$(go env GOOS)_$$(go env GOARCH)"; \
+	if [ ! -x "$$tooldir/covdata" ]; then \
+		echo "covdata missing from toolchain; building it into $$tooldir"; \
+		chmod u+w "$$tooldir" && go build -o "$$tooldir/covdata" cmd/covdata; \
+	fi
 
 # cov-check — reusable floor check over an existing coverprofile. Usage:
 #   make cov-check PROFILE=coverage.integration.out COVERAGE_MIN=30
