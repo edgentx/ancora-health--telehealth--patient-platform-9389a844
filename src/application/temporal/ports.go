@@ -43,8 +43,8 @@ type Notifier interface {
 // mirroring the deduplicating delivery a production notifier guarantees so a
 // retried activity never double-notifies.
 type MemNotifier struct {
-	mu       sync.Mutex
-	seen     map[string]struct{}
+	mu        sync.Mutex
+	seen      map[string]struct{}
 	delivered []Notification
 }
 

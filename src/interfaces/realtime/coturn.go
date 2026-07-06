@@ -2,7 +2,7 @@ package realtime
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- coturn's REST-API long-term-credential scheme (RFC 5389/8489) mandates HMAC-SHA1; the digest authenticates a time-boxed TURN username, not confidentiality.
 	"encoding/base64"
 	"strconv"
 	"time"

@@ -1,16 +1,39 @@
-# Trivy vulnerability waivers for the Ancora Health backend image (S-76).
+# Trivy vulnerability waivers for the Ancora Health container images (S-78).
 #
-# Policy: the image must scan clean of HIGH/CRITICAL findings. The runtime stage
-# is gcr.io/distroless/static-debian12:nonroot — it carries only the static Go
-# binary, ca-certificates, tzdata and /etc/passwd, so the OS-package attack
-# surface is essentially nil. Remaining findings, if any, come from Go module
-# dependencies and are fixed by bumping the module (go get -u) — prefer a fix
-# over a waiver.
+# Scanned images (see security.yml image-scan matrix):
+#   - backend  — gcr.io/distroless/static-debian12:nonroot  (static Go binary,
+#     ca-certificates, tzdata, /etc/passwd only; OS-package surface ~nil).
+#   - frontend — gcr.io/distroless/nodejs22-debian12:nonroot (Node runtime +
+#     the Next.js standalone bundle; carries a small Debian 12 userland).
 #
-# Add a waiver ONLY with: the CVE id, the affected module, why it is not
-# exploitable in this image, and a review date. An unexplained id here is a bug.
+# Policy: images must scan clean of HIGH/CRITICAL. Prefer a FIX over a waiver:
+#   - Go module CVEs -> bump the module (go get) and rebuild.
+#   - Base-image OS CVEs -> re-pull the distroless base once upstream rebuilds.
+# Waive ONLY a finding we cannot fix ourselves (e.g. an OS package in a
+# package-manager-less distroless base awaiting an upstream rebuild) AND that is
+# not exploitable in this image. Every waiver MUST carry: the CVE id, the
+# affected package, why it is not exploitable here, and an expiry (`exp:`) so it
+# is re-evaluated rather than lingering silently. An unexplained id is a bug.
 #
-# Format: one CVE id per line (optionally `CVE-ID exp:YYYY-MM-DD`).
+# Format: one CVE id per line, optionally `CVE-ID exp:YYYY-MM-DD`.
 #
 # --- Active waivers ---
-# (none — the image currently scans clean; see docs/container.md for how to scan)
+#
+# libssl3 (Debian 12) in the frontend distroless base, installed 3.0.18-1~deb12u2,
+# fixed 3.0.19/3.0.20-1~deb12u2. distroless has no apt, so the patch arrives only
+# when Google rebuilds nodejs22-debian12; tracked, re-pull then drop these. None
+# is reachable from the Next.js standalone Node HTTP server, which does not invoke
+# OpenSSL's CMS/PKCS7 or SMIME code paths. Runtime is linux/amd64 (64-bit).
+#
+# CVE-2026-31789 (CRITICAL): heap buffer overflow on 32-bit systems ONLY; the
+# image runs on 64-bit amd64, so it is not applicable.
+CVE-2026-31789 exp:2026-08-06
+# CVE-2026-28387/28388/28389/28390 (HIGH): OpenSSL CMS/PKCS7 DoS (NULL deref /
+# CMS parsing); the Node server never processes attacker-supplied CMS/PKCS7.
+CVE-2026-28387 exp:2026-08-06
+CVE-2026-28388 exp:2026-08-06
+CVE-2026-28389 exp:2026-08-06
+CVE-2026-28390 exp:2026-08-06
+# CVE-2026-45447 (HIGH): use-after-free in OpenSSL PKCS7_verify(); PKCS7_verify
+# is not called by the Next.js runtime.
+CVE-2026-45447 exp:2026-08-06

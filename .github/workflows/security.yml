@@ -1,0 +1,123 @@
+name: Security
+
+# S-78 — Security scanning gate. Three independent, blocking checks:
+#   * deps  — dependency + stdlib vulnerabilities (govulncheck, Trivy fs, npm
+#             audit), failing on HIGH/CRITICAL.
+#   * sast  — basic static analysis of the Go source (gosec).
+#   * image — container image vulnerability scan of the built backend and
+#             frontend images (Trivy), failing on HIGH/CRITICAL.
+# HIGH/CRITICAL findings block the merge unless waived: OS/library findings via
+# .trivyignore (with a justification + review date) and gosec findings via an
+# inline `#nosec` comment. See docs/pipeline.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deps:
+    name: Dependency vulnerabilities (Go + npm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: govulncheck (Go modules + stdlib, reachability-aware)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      - name: Trivy filesystem scan (dependency manifests)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: .trivyignore
+          scan-ref: .
+
+      - name: npm audit (frontend, production deps)
+        working-directory: web
+        run: |
+          npm ci
+          npm audit --omit=dev --audit-level=high
+
+  sast:
+    name: SAST (gosec)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: gosec static analysis
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          make sast
+
+  image:
+    name: Image scan (backend + frontend)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend-api
+            context: .
+            target: api
+          - name: frontend
+            context: web
+            target: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning (load into local docker)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          load: true
+          push: false
+          tags: ancora-scan/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Trivy image scan (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ancora-scan/${{ matrix.name }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore

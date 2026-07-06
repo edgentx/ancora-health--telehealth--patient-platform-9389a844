@@ -1,0 +1,151 @@
+name: Release
+
+# S-78 — Continuous delivery. On merge to the release branch (main) this builds
+# and pushes the backend (api/realtime/worker) and frontend (web) images to the
+# configured registry tagged with the git sha, then deploys them to the target
+# namespace with the Helm chart (S-77) and waits for the rollout, rolling back
+# on failure.
+#
+# Registry and target are deploy-time configuration (repository Variables, with
+# safe defaults) and never hardcoded secrets:
+#   Variables: REGISTRY (ghcr.io), IMAGE_ORG (edgentx), IMAGE_NAME (ancora),
+#              DEPLOY_NAMESPACE (ancora), HELM_ENV (prod)
+#   Secrets:   REGISTRY_USERNAME/REGISTRY_TOKEN (registry login; default to the
+#              built-in GITHUB_TOKEN for ghcr.io), KUBE_CONFIG (base64 kubeconfig)
+# See docs/pipeline.md.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  # One release at a time per branch; do not cancel an in-flight deploy.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ${{ vars.REGISTRY || 'ghcr.io' }}
+  IMAGE_ORG: ${{ vars.IMAGE_ORG || 'edgentx' }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'ancora' }}
+
+jobs:
+  build-push:
+    name: Build & push ${{ matrix.name }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: .
+            target: api
+          - name: realtime
+            context: .
+            target: realtime
+          - name: worker
+            context: .
+            target: worker
+          - name: web
+            context: web
+            target: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.REGISTRY_USERNAME || github.actor }}
+          password: ${{ secrets.REGISTRY_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Build metadata
+        id: meta
+        run: echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push (sha + latest, GHA layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          push: true
+          # These coordinates are exactly what the Helm `ancora.image` helper
+          # resolves: <registry>/<org>/<name>/<target>:<tag>.
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/${{ env.IMAGE_NAME }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/${{ env.IMAGE_NAME }}/${{ matrix.name }}:latest
+          build-args: |
+            VERSION=${{ github.sha }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    name: Deploy to ${{ vars.DEPLOY_NAMESPACE || 'ancora' }}
+    needs: build-push
+    runs-on: ubuntu-latest
+    # GitHub Environment gate — attach protection rules / required reviewers here.
+    environment: ${{ vars.HELM_ENV || 'prod' }}
+    env:
+      NAMESPACE: ${{ vars.DEPLOY_NAMESPACE || 'ancora' }}
+      HELM_ENV: ${{ vars.HELM_ENV || 'prod' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Write kubeconfig from secret
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          if [ -z "$KUBE_CONFIG" ]; then
+            echo "KUBE_CONFIG secret is not set — cannot deploy." >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/.kube"
+          echo "$KUBE_CONFIG" | base64 -d > "$RUNNER_TEMP/.kube/config"
+          chmod 600 "$RUNNER_TEMP/.kube/config"
+          echo "KUBECONFIG=$RUNNER_TEMP/.kube/config" >> "$GITHUB_ENV"
+
+      - name: Select environment values file
+        id: values
+        run: |
+          file="deploy/helm/ancora/values-${HELM_ENV}.yaml"
+          if [ ! -f "$file" ]; then
+            echo "No overlay $file; deploying with chart defaults only." >&2
+            echo "arg=" >> "$GITHUB_OUTPUT"
+          else
+            echo "arg=-f $file" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: helm upgrade --install (wait for rollout, atomic rollback)
+        run: |
+          helm upgrade --install ancora deploy/helm/ancora \
+            --namespace "$NAMESPACE" --create-namespace \
+            -f deploy/helm/ancora/values.yaml \
+            ${{ steps.values.outputs.arg }} \
+            --set image.registry="${REGISTRY}/${IMAGE_ORG}" \
+            --set image.repository="${IMAGE_NAME}" \
+            --set image.tag="${GITHUB_SHA}" \
+            --wait --atomic --timeout 10m
+
+      - name: Roll back on failed rollout (defense in depth)
+        if: failure()
+        continue-on-error: true
+        run: |
+          # --atomic already restores the prior revision on failure; this is an
+          # explicit fallback and a no-op if there is nothing to roll back to.
+          helm rollback ancora --namespace "$NAMESPACE" --wait --timeout 5m || \
+            echo "No previous revision to roll back to (first install)."

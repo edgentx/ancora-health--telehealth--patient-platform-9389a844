@@ -292,8 +292,8 @@ func (a *Activities) VoidInvoice(ctx context.Context, in VoidInvoiceInput) error
 
 // ResultsReadyInput is the payload for NotifyResultsReady.
 type ResultsReadyInput struct {
-	LabOrderID string
-	PatientID  string
+	LabOrderID  string
+	PatientID   string
 	EncounterID string
 }
 

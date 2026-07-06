@@ -1,0 +1,3 @@
+# Static assets served verbatim by Next.js at the site root live here.
+# Tracked (even when empty) so the container build's `COPY public` stage and the
+# standalone server's static-file handler always have a directory to reference.
