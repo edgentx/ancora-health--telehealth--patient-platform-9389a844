@@ -58,6 +58,13 @@ INTEGRATION_COVERAGE_MIN ?= 30
 
 # coverage — module-wide unit coverage gate. Runs the full unit suite with a
 # coverage profile, prints the total, and fails if it is under COVERAGE_MIN.
+#
+# NOTE: the reported total is only trustworthy when the `covdata` tool is present
+# in the active toolchain. Some downloaded toolchains ship without it; under
+# `-coverprofile` every package that has no test files then fails to emit its
+# zero-coverage entry and drops out of coverage.unit.out entirely, INFLATING the
+# local total so it no longer matches CI. If a local number disagrees with CI,
+# build the tool first:  go build -o "$(shell go env GOROOT)/pkg/tool/$(shell go env GOOS)_$(shell go env GOARCH)/covdata" cmd/covdata
 coverage:
 	go test -covermode=atomic -coverprofile=coverage.unit.out ./...
 	@$(MAKE) --no-print-directory cov-check PROFILE=coverage.unit.out COVERAGE_MIN=$(COVERAGE_MIN)
