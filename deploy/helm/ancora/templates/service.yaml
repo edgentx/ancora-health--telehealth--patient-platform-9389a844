@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "ancora.labels" $root | nindent 4 }}
     app.kubernetes.io/component: {{ $name }}
-  {{- if $root.Values.metrics.enabled }}
+  {{- if and $root.Values.metrics.enabled (not (eq $component.metrics false)) }}
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/path: {{ $root.Values.metrics.path | quote }}

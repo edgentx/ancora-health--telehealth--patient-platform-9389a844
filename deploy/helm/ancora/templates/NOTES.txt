@@ -8,10 +8,11 @@ Components:
 {{- end }}
 
 Edge:
-  App host: https://{{ .Values.ingress.hosts.app }}
-  WS host:  https://{{ .Values.ingress.hosts.ws }}
+  App host: https://{{ .Values.ingress.hosts.app }}  (Next.js web app)
+  API host: https://{{ .Values.ingress.hosts.api }}  (REST/GraphQL, Kong edge)
+  WS host:  https://{{ .Values.ingress.hosts.ws }}  (realtime gateway)
 {{- if .Values.ingress.certManager.enabled }}
-  TLS:      cert-manager {{ .Values.ingress.certManager.issuerKind }}/{{ .Values.ingress.certManager.issuer }} -> secret {{ .Values.ingress.tls.secretName }}
+  TLS:      cert-manager {{ .Values.ingress.certManager.issuerKind }}/{{ .Values.ingress.certManager.issuer }} -> secrets {{ .Values.ingress.tls.secretName }} (api/ws) + {{ .Values.ingress.tls.secretName }}-web (app)
 {{- end }}
 {{- if .Values.kong.enabled }}
   Kong:     jwt, cors, request-transformer (tenant + version), rate-limiting ({{ .Values.kong.rateLimiting.policy }}), opa

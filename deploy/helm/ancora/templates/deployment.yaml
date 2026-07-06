@@ -24,7 +24,7 @@ spec:
       annotations:
         # Roll pods when the non-secret config changes.
         checksum/config: {{ include (print $root.Template.BasePath "/configmap.yaml") $root | sha256sum }}
-        {{- if $root.Values.metrics.enabled }}
+        {{- if and $root.Values.metrics.enabled (not (eq $component.metrics false)) }}
         prometheus.io/scrape: "true"
         prometheus.io/path: {{ $root.Values.metrics.path | quote }}
         prometheus.io/port: {{ $component.containerPort | quote }}
@@ -52,14 +52,24 @@ spec:
           env:
             - name: PORT
               value: {{ $component.containerPort | quote }}
+            {{- range $k, $v := $component.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- if not (eq $component.mountPlatformEnv false) }}
+          # Shared platform config + secret. Skipped for browser-facing tiers
+          # (mountPlatformEnv: false) so they never carry backend credentials.
           envFrom:
             - configMapRef:
                 name: {{ include "ancora.configMapName" $root }}
             - secretRef:
                 name: {{ include "ancora.secretName" $root }}
+          {{- end }}
           livenessProbe:
             httpGet:
-              path: {{ $root.Values.probes.liveness.path }}
+              # A component may override just the path (e.g. web -> /healthz);
+              # timing stays on the shared defaults.
+              path: {{ dig "probes" "liveness" "path" $root.Values.probes.liveness.path $component }}
               port: {{ $root.Values.metrics.portName }}
             initialDelaySeconds: {{ $root.Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ $root.Values.probes.liveness.periodSeconds }}
@@ -67,7 +77,7 @@ spec:
             failureThreshold: {{ $root.Values.probes.liveness.failureThreshold }}
           readinessProbe:
             httpGet:
-              path: {{ $root.Values.probes.readiness.path }}
+              path: {{ dig "probes" "readiness" "path" $root.Values.probes.readiness.path $component }}
               port: {{ $root.Values.metrics.portName }}
             initialDelaySeconds: {{ $root.Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ $root.Values.probes.readiness.periodSeconds }}
@@ -81,6 +91,12 @@ spec:
             # Read-only rootfs: give the process a writable scratch dir for /tmp.
             - name: tmp
               mountPath: /tmp
+            {{- if $component.cacheVolume }}
+            # Next.js standalone writes its runtime cache here; the rest of the
+            # rootfs stays read-only.
+            - name: cache
+              mountPath: /app/.next/cache
+            {{- end }}
         {{- if and $component.opa $component.opa.enabled $root.Values.kong.enabled $root.Values.kong.opa.enabled }}
         # OPA sidecar: edge authorization decisions for this component, loading
         # the Rego policy from the shared ConfigMap. Kong's opa plugin queries
@@ -115,6 +131,10 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if $component.cacheVolume }}
+        - name: cache
+          emptyDir: {}
+        {{- end }}
         {{- if and $component.opa $component.opa.enabled $root.Values.kong.enabled $root.Values.kong.opa.enabled }}
         - name: opa-policy
           configMap:

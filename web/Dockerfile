@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Multi-stage build for the Ancora Health Next.js frontend (S-78).
+# Multi-stage build for the Ancora Health Next.js frontend (S-83).
 #
 # Mirrors the backend image's security posture (S-76): a fat build stage that
 # never ships, and a minimal, non-root distroless runtime that carries only the
@@ -11,7 +11,10 @@
 #   docker build -t ancora/web web
 #
 # The build is fully offline after `npm ci`; PORT (default 3000) selects the
-# listen port at run time.
+# listen port at run time. Endpoint config (API/WS URLs) is NOT baked in: the
+# server resolves it from the container environment per request and injects it
+# into the document (src/lib/env.ts), so one image retargets to any environment
+# via env vars — no rebuild.
 
 ########################  Dependencies  ########################
 # Install with the lockfile only, in its own layer, so a source-only change does

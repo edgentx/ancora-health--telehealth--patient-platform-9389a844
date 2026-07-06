@@ -3,6 +3,7 @@
 {{- $fullname := include "ancora.fullname" . -}}
 {{- $apiSvc := printf "%s-api" $fullname -}}
 {{- $wsSvc := printf "%s-realtime" $fullname -}}
+{{- $webSvc := printf "%s-web" $fullname -}}
 {{- $apiPort := .Values.components.api.service.port -}}
 {{- $wsPort := .Values.components.realtime.service.port -}}
 {{- /* Assemble the Kong plugin list attached at the edge. */ -}}
@@ -13,7 +14,9 @@
 {{- if .Values.kong.tenant.enabled -}}{{- $plugins = append $plugins (printf "%s-tenant" $fullname) -}}{{- end -}}
 {{- if .Values.kong.rateLimiting.enabled -}}{{- $plugins = append $plugins (printf "%s-rate-limiting" $fullname) -}}{{- end -}}
 {{- if .Values.kong.opa.enabled -}}{{- $plugins = append $plugins (printf "%s-opa" $fullname) -}}{{- end -}}
-{{- end -}}
+{{- end }}
+# Edge Ingress: the authenticated business surface. api.* (REST/GraphQL) and
+# ws.* (realtime) sit behind the Kong jwt/cors/tenant/rate-limiting/opa plugins.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -50,12 +53,12 @@ spec:
   {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
-        - {{ .Values.ingress.hosts.app | quote }}
+        - {{ .Values.ingress.hosts.api | quote }}
         - {{ .Values.ingress.hosts.ws | quote }}
       secretName: {{ .Values.ingress.tls.secretName }}
   {{- end }}
   rules:
-    - host: {{ .Values.ingress.hosts.app | quote }}
+    - host: {{ .Values.ingress.hosts.api | quote }}
       http:
         paths:
           - path: /
@@ -75,4 +78,50 @@ spec:
                 name: {{ $wsSvc }}
                 port:
                   number: {{ $wsPort }}
+{{- if and .Values.components.web .Values.components.web.enabled .Values.components.web.service .Values.components.web.service.enabled }}
+---
+# Web Ingress: the public browser app (app.*). Kept as its own Ingress WITHOUT
+# the Kong jwt/opa plugins so unauthenticated visitors can load the app and its
+# assets; authentication happens inside the app via the edge login flow. Still
+# fronted by the same controller with TLS + HTTPS redirect (S-83).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $webSvc }}
+  namespace: {{ include "ancora.namespace" . }}
+  labels:
+    {{- include "ancora.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+  annotations:
+    {{- if .Values.ingress.certManager.enabled }}
+    {{- if eq .Values.ingress.certManager.issuerKind "ClusterIssuer" }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certManager.issuer | quote }}
+    {{- else }}
+    cert-manager.io/issuer: {{ .Values.ingress.certManager.issuer | quote }}
+    {{- end }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.app | quote }}
+      secretName: {{ printf "%s-web" .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hosts.app | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $webSvc }}
+                port:
+                  number: {{ .Values.components.web.service.port }}
+{{- end }}
 {{- end -}}

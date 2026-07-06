@@ -91,9 +91,12 @@ at the coordinates the Helm `ancora.image` helper resolves:
 
 The deploy step passes `--set image.registry=<REGISTRY>/<IMAGE_ORG>
 --set image.repository=<IMAGE_NAME> --set image.tag=<git-sha>` so pods pull the
-exact artifacts the build produced. (The `web` image is published for the
-frontend surface; wiring it into the chart's component map is a values-only
-follow-up in S-77's chart.)
+exact artifacts the build produced. The `web` image is a first-class component
+in the Helm chart (`components.web`, S-83): it deploys as its own Deployment +
+Service behind a dedicated `app.*` Ingress (TLS, no Kong auth plugins so guests
+can load the app), probed on the Next.js `/healthz` route. Endpoint config
+(API/WS URLs) is injected at runtime from `components.web.env`, so the same
+image serves any environment without a rebuild.
 
 ## Deploy behaviour (rollout & rollback)
 
