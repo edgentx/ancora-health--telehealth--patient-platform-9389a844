@@ -16,9 +16,10 @@ namespace:
   name: ancora
 
 image:
-  # Images are built from the multi-stage Dockerfile as api/realtime/worker
-  # targets (S-76). `registry/repository` + a per-component `imageTarget` form
-  # the full reference, e.g. ghcr.io/edgentx/ancora/api:<tag>.
+  # Images are built from the multi-stage Dockerfiles: api/realtime/worker from
+  # the Go Dockerfile (S-76) and web from web/Dockerfile (S-83). `registry/
+  # repository` + a per-component `imageTarget` form the full reference, e.g.
+  # ghcr.io/edgentx/ancora/api:<tag> or ghcr.io/edgentx/ancora/web:<tag>.
   registry: ghcr.io/edgentx
   repository: ancora
   # -- Image tag; empty string falls back to the chart appVersion.
@@ -135,6 +136,50 @@ components:
     opa:
       enabled: false
 
+  # Next.js frontend (web/Dockerfile, S-83). It serves the browser app rather
+  # than the platform ops surface, so it opts out of the Go-tier conventions:
+  web:
+    enabled: true
+    imageTarget: web
+    replicas: 2
+    # Next.js standalone server listens on :3000 (PORT is injected below).
+    containerPort: 3000
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+    # Exposes no Prometheus /metrics endpoint: skip the scrape annotations that
+    # would otherwise point Prometheus at a 404.
+    metrics: false
+    # Do NOT inject the platform Secret (Mongo/Stripe/PHI keys) into a pod whose
+    # process is reachable from the browser tier; it gets only the env below.
+    mountPlatformEnv: false
+    # Probe the app's own lightweight, unauthenticated /healthz route instead of
+    # the Go tier's /health + /ready ops endpoints.
+    probes:
+      liveness:
+        path: /healthz
+      readiness:
+        path: /healthz
+    # Endpoint configuration read by the Next.js server at boot and injected into
+    # the browser — retarget per environment WITHOUT rebuilding the image (S-83).
+    # These are unprefixed *runtime* keys, not build-time NEXT_PUBLIC_* values.
+    env:
+      PROJECT_SLUG: ancora
+      API_BASE_URL: https://api.ancora.vforce360.ai
+      WS_BASE_URL: wss://ws.ancora.vforce360.ai
+      GRAPHQL_PATH: /graphql
+      OTEL_SERVICE_NAME: ancora-web
+      EDGE_LOGIN_URL: /auth/login
+      EDGE_LOGOUT_URL: /auth/logout
+    # The standalone server writes its runtime cache under an otherwise read-only
+    # rootfs; mount a writable emptyDir at .next/cache for it.
+    cacheVolume: true
+    args: []
+    resources: {}
+    opa:
+      enabled: false
+
 # Non-secret configuration -> ConfigMap, injected into every component via
 # envFrom. Secrets (below) supply the sensitive values with the same keys.
 config:
@@ -184,12 +229,16 @@ ingress:
   # annotations apply under NGINX. Default targets the VForce360 NGINX ingress.
   className: nginx
   hosts:
-    # app.* serves the API + static app; ws.* serves the realtime gateway.
+    # app.* serves the Next.js web app (S-83); api.* the REST/GraphQL API; ws.*
+    # the realtime gateway. The web host is a separate Ingress without the Kong
+    # business plugins so guests can load the app before authenticating.
     app: app.ancora.vforce360.ai
+    api: api.ancora.vforce360.ai
     ws: ws.ancora.vforce360.ai
   tls:
     enabled: true
-    # Secret cert-manager writes the issued certificate into.
+    # Secret cert-manager writes the api/ws certificate into. The web host gets
+    # its own certificate in "<secretName>-web".
     secretName: ancora-tls
   certManager:
     enabled: true

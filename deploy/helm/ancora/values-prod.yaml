@@ -27,6 +27,13 @@ components:
     replicas: 3
   worker:
     replicas: 2
+  web:
+    replicas: 3
+    # Point the browser bundle at the production edge hosts. Injected at runtime
+    # from the container environment — no image rebuild to retarget (S-83).
+    env:
+      API_BASE_URL: https://api.ancora.vforce360.ai
+      WS_BASE_URL: wss://ws.ancora.vforce360.ai
 
 config:
   MONGODB_DATABASE: ancora_prod
@@ -36,6 +43,7 @@ config:
 ingress:
   hosts:
     app: app.ancora.vforce360.ai
+    api: api.ancora.vforce360.ai
     ws: ws.ancora.vforce360.ai
   certManager:
     issuer: letsencrypt-prod
