@@ -1,121 +1,119 @@
+```markdown
 # Ancora Health — Navigation Specification
 
 ---
 
 ## 1. Site Map
 
-### Public Area (no authentication required)
+### Public (No Auth Required)
 
-- **Marketing Home** (`/`) — `none`
-- **Login** (`/login`) — `none`
-- **Patient Sign-Up** (`/signup`) — `none`
-- **Provider Registration** (`/provider-signup`) — `none`
-- **Forgot Password** (`/forgot-password`) — `none`
-- **Reset Password** (`/reset-password`) — `none`
-- **Email Verification** (`/verify-email`) — `none`
-- **Provider Discovery** (`/providers`) — `primary`
-- **Provider Public Profile** (`/providers/:id`) — `none`
+#### Primary Nav
+- Provider Directory (`/provider-directory`)
 
-### Patient Area (role: `patient`)
+#### No Nav
+- Home / Marketing Landing (`/`)
+- Provider Public Profile (`/providers/:id`)
+- Forgot Password (`/forgot-password`)
+- Reset Password (`/reset-password`)
+- Email Verification (`/verify-email`)
 
-#### Primary Navigation
-- **Patient Dashboard** (`/dashboard`)
-- **Patient Appointments** (`/appointments`)
-- **Provider Discovery** (`/providers`) *(shared with public)*
-- **Secure Messaging Inbox** (`/messages`) *(shared across roles)*
+#### Utility Nav
+- Login (`/login`)
+- Patient Sign-Up (`/signup`)
 
-#### Secondary Navigation
-- **Health Profile** (`/health-profile`)
-- **Prescriptions** (`/prescriptions`)
-- **Documents & Lab Results** (`/documents`)
-- **Billing & Invoices** (`/billing`)
+---
 
-#### Utility Navigation *(shared across all authenticated roles)*
-- **Notifications** (`/notifications`)
-- **Account Settings** (`/settings/account`)
-- **Security Settings** (`/settings/security`)
+### Authenticated — Patient
 
-#### Unlisted / Flow Pages
-- **Patient Onboarding** (`/onboarding`)
-- **Appointment Detail** (`/appointments/:id`)
-- **Book Appointment** (`/appointments/book`)
-- **Virtual Waiting Room** (`/visit/:id/waiting-room`)
-- **Video Visit** (`/visit/:id`)
-- **After-Visit Summary** (`/visit/:id/summary`)
-- **Make a Payment** (`/billing/pay`)
-- **Secure Message Thread** (`/messages/:id`)
+#### Primary Nav
+- Patient Dashboard (`/patient/dashboard`)
+- Find a Provider (`/patient/providers`)
+- My Appointments (`/patient/appointments`)
+- Messages (`/patient/messages`)
 
-### Provider Area (role: `provider`)
+#### Secondary Nav
+- Health Records (`/patient/records`)
+- My Prescriptions (`/patient/prescriptions`)
+- Billing & Invoices (`/patient/billing`)
+- Insurance Information (`/patient/insurance`)
 
-#### Primary Navigation
-- **Provider Dashboard** (`/provider/dashboard`)
-- **Provider Schedule** (`/provider/schedule`)
-- **Secure Messaging Inbox** (`/messages`) *(shared across roles)*
+#### Utility Nav
+- Patient Profile & Settings (`/patient/settings`)
 
-#### Secondary Navigation
-- **Clinical Notes Editor** (`/provider/notes`)
-- **Patient Chart (EHR)** (`/provider/chart/:patientId`) *(also accessible to `scheduler`)*
-- **E-Prescribing** (`/provider/prescribe`)
-- **Provider Billing & Claims** (`/provider/billing`)
-- **Patient Lookup** (`/provider/patients`) *(also accessible to `scheduler`)*
+#### No Nav (Workflow / Deep Pages)
+- Book Appointment (`/patient/book`)
+- Appointment Detail (`/patient/appointments/:id`)
+- Patient Waiting Room (`/patient/appointments/:id/waiting-room`)
+- Video Visit (`/patient/appointments/:id/visit`)
+- Message Thread (`/patient/messages/:threadId`)
+- Make a Payment (`/patient/billing/pay`)
 
-#### Utility Navigation *(shared)*
-- **Notifications** (`/notifications`)
-- **Account Settings** (`/settings/account`)
-- **Security Settings** (`/settings/security`)
+---
 
-#### Unlisted / Flow Pages
-- **Provider Onboarding** (`/provider/onboarding`)
-- **Appointment Detail (Provider)** (`/provider/appointments/:id`)
-- **Video Visit (Provider)** (`/provider/visit/:id`)
-- **Visit Sign-Off** (`/provider/visit/:id/sign-off`)
-- **Secure Message Thread** (`/messages/:id`)
+### Authenticated — Provider
 
-### Scheduler Area (role: `scheduler`)
+#### Primary Nav
+- Provider Dashboard (`/provider/dashboard`)
+- Schedule / Calendar (`/provider/schedule`)
+- Today's Appointment Queue (`/provider/queue`)
+- Messages (`/provider/messages`)
 
-#### Primary Navigation
-- **Scheduler Dashboard** (`/scheduler/dashboard`)
-- **Schedule Management** (`/scheduler/schedule`)
-- **Secure Messaging Inbox** (`/messages`) *(shared across roles)*
+#### Secondary Nav
+- Billing & Claims Review (`/provider/billing`)
+- Availability Settings (`/provider/availability`)
 
-#### Secondary Navigation
-- **Patient Chart (EHR)** (`/provider/chart/:patientId`) *(shared with `provider`)*
-- **Patient Lookup** (`/scheduler/patients`) *(shared with `provider`)*
-- **Provider Availability Management** (`/scheduler/availability`) *(also accessible to `admin`)*
-- **Insurance Eligibility Verification** (`/scheduler/eligibility`)
+#### Utility Nav
+- Edit Provider Profile (`/provider/profile`)
 
-#### Utility Navigation *(shared)*
-- **Notifications** (`/notifications`)
-- **Account Settings** (`/settings/account`)
-- **Security Settings** (`/settings/security`)
+#### No Nav (Workflow / Deep Pages)
+- Appointment Detail (`/provider/appointments/:id`)
+- Provider Waiting Room (`/provider/appointments/:id/waiting-room`)
+- Video Visit (`/provider/appointments/:id/visit`)
+- Patient Chart (`/provider/patients/:patientId/chart`)
+- Clinical Notes / Documentation (`/provider/appointments/:id/notes`)
+- E-Prescribing (`/provider/appointments/:id/prescribe`)
+- Message Thread (`/provider/messages/:threadId`)
 
-#### Unlisted / Flow Pages
-- **New Appointment** (`/scheduler/appointments/new`)
-- **Patient Check-In** (`/scheduler/check-in/:appointmentId`)
-- **Secure Message Thread** (`/messages/:id`)
+---
 
-### Admin Area (role: `admin`)
+### Authenticated — Scheduler (Front Desk)
 
-#### Primary Navigation
-- **Admin Dashboard** (`/admin/dashboard`)
-- **Analytics & Reporting** (`/admin/analytics`)
-- **Provider Management** (`/admin/providers`)
-- **User & Role Management** (`/admin/users`)
-- **Secure Messaging Inbox** (`/messages`) *(shared across roles)*
+#### Primary Nav
+- Scheduler Dashboard (`/scheduler/dashboard`)
+- Appointment Management (`/scheduler/appointments`)
+- Patient Search (`/scheduler/patients`)
 
-#### Secondary Navigation
-- **Billing Operations** (`/admin/billing`)
-- **PHI Access Audit Log** (`/admin/audit-log`)
-- **Clinic Settings** (`/admin/settings`)
-- **Provider Availability Management** (`/admin/availability`) *(shared with `scheduler`)*
+#### Secondary Nav
+- Waitlist Management (`/scheduler/waitlist`)
 
-#### Utility Navigation *(shared)*
-- **Notifications** (`/notifications`)
-- **Account Settings** (`/settings/account`)
-- **Security Settings** (`/settings/security`)
+#### No Nav (Workflow / Deep Pages)
+- Schedule Appointment (`/scheduler/appointments/new`)
+- Patient Profile — Front Desk View (`/scheduler/patients/:id`)
+- Patient Check-In (`/scheduler/appointments/:id/check-in`)
 
-#### Unlisted / Flow Pages
-- **Secure Message Thread** (`/messages/:id`)
+---
+
+### Authenticated — Clinic Admin
+
+#### Primary Nav
+- Admin Dashboard (`/admin/dashboard`)
+- Provider Management (`/admin/providers`)
+- Patient Management (`/admin/patients`)
+- Billing Operations (`/admin/billing`)
+
+#### Secondary Nav
+- Utilization Report (`/admin/reports/utilization`)
+- Revenue Report (`/admin/reports/revenue`)
+- No-Show Report (`/admin/reports/no-shows`)
+- HIPAA Audit Log (`/admin/audit-log`)
+
+#### Utility Nav
+- Clinic Settings (`/admin/settings`)
+- User Management (`/admin/users`)
+- Role & Permissions (`/admin/roles`)
+
+#### No Nav (Shared / Deep Pages)
+- Patient Chart (`/admin/patients/:patientId/chart`) *(shared with provider role)*
 
 ---
 
@@ -123,200 +121,249 @@
 
 Pages accessible without authentication.
 
-| Page | ID | Notes |
-|---|---|---|
-| Marketing Home | `home` | Primary marketing entry point; CTAs for patient and provider sign-up |
-| Login | `login` | Supports MFA; redirects to role-appropriate dashboard post-login |
-| Patient Sign-Up | `signup` | Collects identity, contact, and insurance |
-| Provider Registration | `provider-signup` | Collects credentials, NPI, specialties, and license |
-| Forgot Password | `forgot-password` | Dispatches reset link to verified email |
-| Reset Password | `reset-password` | Token-gated; valid only via recovery link |
-| Email Verification | `verify-email` | Reached via registration confirmation link |
-| Provider Discovery | `provider-search` | Searchable directory; publicly browsable |
-| Provider Public Profile | `provider-profile` | Read-only bio and booking CTA; auth required to complete booking |
+| Page | Path | Nav Section | Description |
+|------|------|-------------|-------------|
+| Home / Marketing Landing | `/` | — | Platform introduction; drives patient and provider sign-ups |
+| Login | `/login` | Utility | Unified sign-in for all roles; routes to role-specific dashboard on success |
+| Patient Sign-Up | `/signup` | Utility | New patient registration form |
+| Forgot Password | `/forgot-password` | — | Initiates email-based password-reset flow |
+| Reset Password | `/reset-password` | — | Token-authenticated form to set a new password |
+| Email Verification | `/verify-email` | — | Post-registration email confirmation gate |
+| Provider Directory | `/provider-directory` | Primary | Searchable, filterable directory of all clinicians |
+| Provider Public Profile | `/providers/:id` | — | Clinician specialty, credentials, availability, and booking CTA |
 
 ---
 
 ## 3. Authenticated Routes
 
-### All Authenticated Users (any role)
+### Patient Role
 
-| Page | ID | Notes |
-|---|---|---|
-| Secure Messaging Inbox | `messaging-inbox` | HIPAA-compliant; primary nav for all roles |
-| Secure Message Thread | `messaging-thread` | Unlisted; opened from inbox |
-| Notifications | `notifications` | Utility nav; all roles |
-| Account Settings | `settings-account` | Utility nav; all roles |
-| Security Settings | `settings-security` | Utility nav; all roles |
+| Page | Path | Nav Section |
+|------|------|-------------|
+| Patient Dashboard | `/patient/dashboard` | Primary |
+| Find a Provider | `/patient/providers` | Primary |
+| My Appointments | `/patient/appointments` | Primary |
+| Messages | `/patient/messages` | Primary |
+| Health Records | `/patient/records` | Secondary |
+| My Prescriptions | `/patient/prescriptions` | Secondary |
+| Billing & Invoices | `/patient/billing` | Secondary |
+| Insurance Information | `/patient/insurance` | Secondary |
+| Patient Profile & Settings | `/patient/settings` | Utility |
+| Book Appointment | `/patient/book` | — |
+| Appointment Detail | `/patient/appointments/:id` | — |
+| Patient Waiting Room | `/patient/appointments/:id/waiting-room` | — |
+| Video Visit | `/patient/appointments/:id/visit` | — |
+| Message Thread | `/patient/messages/:threadId` | — |
+| Make a Payment | `/patient/billing/pay` | — |
 
-### Role: `patient`
+### Provider Role
 
-| Page | ID | Nav |
-|---|---|---|
-| Patient Onboarding | `onboarding-patient` | Unlisted (first-run wizard) |
-| Patient Dashboard | `patient-dashboard` | Primary |
-| Patient Appointments | `appointments-patient` | Primary |
-| Appointment Detail (Patient) | `appointment-detail-patient` | Unlisted |
-| Book Appointment | `appointment-book` | Unlisted (flow entry from provider profile or dashboard) |
-| Virtual Waiting Room | `waiting-room` | Unlisted |
-| Video Visit (Patient) | `video-visit-patient` | Unlisted |
-| After-Visit Summary (Patient) | `visit-summary-patient` | Unlisted |
-| Health Profile | `health-profile` | Secondary |
-| Prescriptions | `prescriptions-patient` | Secondary |
-| Documents & Lab Results | `documents-patient` | Secondary |
-| Billing & Invoices (Patient) | `billing-patient` | Secondary |
-| Make a Payment | `payment` | Unlisted |
+| Page | Path | Nav Section |
+|------|------|-------------|
+| Provider Dashboard | `/provider/dashboard` | Primary |
+| Schedule / Calendar | `/provider/schedule` | Primary |
+| Today's Appointment Queue | `/provider/queue` | Primary |
+| Messages | `/provider/messages` | Primary |
+| Billing & Claims Review | `/provider/billing` | Secondary |
+| Availability Settings | `/provider/availability` | Secondary |
+| Edit Provider Profile | `/provider/profile` | Utility |
+| Appointment Detail | `/provider/appointments/:id` | — |
+| Provider Waiting Room | `/provider/appointments/:id/waiting-room` | — |
+| Video Visit | `/provider/appointments/:id/visit` | — |
+| Patient Chart | `/provider/patients/:patientId/chart` | — |
+| Clinical Notes / Documentation | `/provider/appointments/:id/notes` | — |
+| E-Prescribing | `/provider/appointments/:id/prescribe` | — |
+| Message Thread | `/provider/messages/:threadId` | — |
 
-### Role: `provider`
+### Scheduler (Front Desk) Role
 
-| Page | ID | Nav |
-|---|---|---|
-| Provider Onboarding | `onboarding-provider` | Unlisted (first-run wizard) |
-| Provider Dashboard | `provider-dashboard` | Primary |
-| Provider Schedule | `provider-schedule` | Primary |
-| Appointment Detail (Provider) | `appointment-detail-provider` | Unlisted |
-| Video Visit (Provider) | `video-visit-provider` | Unlisted |
-| Clinical Notes Editor | `clinical-notes` | Secondary |
-| Patient Chart (EHR) | `patient-chart` | Secondary *(shared with `scheduler`)* |
-| E-Prescribing | `eprescribing` | Secondary |
-| Visit Sign-Off (Provider) | `visit-summary-provider` | Unlisted |
-| Provider Billing & Claims | `provider-billing` | Secondary |
-| Patient Lookup | `patient-lookup` | Secondary *(shared with `scheduler`)* |
+| Page | Path | Nav Section |
+|------|------|-------------|
+| Scheduler Dashboard | `/scheduler/dashboard` | Primary |
+| Appointment Management | `/scheduler/appointments` | Primary |
+| Patient Search | `/scheduler/patients` | Primary |
+| Waitlist Management | `/scheduler/waitlist` | Secondary |
+| Schedule Appointment | `/scheduler/appointments/new` | — |
+| Patient Profile (Front Desk) | `/scheduler/patients/:id` | — |
+| Patient Check-In | `/scheduler/appointments/:id/check-in` | — |
 
-### Role: `scheduler`
+### Clinic Admin Role
 
-| Page | ID | Nav |
-|---|---|---|
-| Scheduler Dashboard | `scheduler-dashboard` | Primary |
-| Schedule Management | `schedule-management` | Primary |
-| Patient Lookup | `patient-lookup` | Secondary *(shared with `provider`)* |
-| Patient Chart (EHR) | `patient-chart` | Secondary *(shared with `provider`)* |
-| New Appointment (Scheduler) | `new-appointment` | Unlisted |
-| Provider Availability Management | `provider-availability` | Secondary *(shared with `admin`)* |
-| Patient Check-In | `patient-checkin` | Unlisted |
-| Insurance Eligibility Verification | `insurance-verification` | Secondary |
+| Page | Path | Nav Section |
+|------|------|-------------|
+| Admin Dashboard | `/admin/dashboard` | Primary |
+| Provider Management | `/admin/providers` | Primary |
+| Patient Management | `/admin/patients` | Primary |
+| Billing Operations | `/admin/billing` | Primary |
+| Utilization Report | `/admin/reports/utilization` | Secondary |
+| Revenue Report | `/admin/reports/revenue` | Secondary |
+| No-Show Report | `/admin/reports/no-shows` | Secondary |
+| HIPAA Audit Log | `/admin/audit-log` | Secondary |
+| Clinic Settings | `/admin/settings` | Utility |
+| User Management | `/admin/users` | Utility |
+| Role & Permissions | `/admin/roles` | Utility |
+| Patient Chart | `/admin/patients/:patientId/chart` | — |
 
-### Role: `admin`
+### Shared Access
 
-| Page | ID | Nav |
-|---|---|---|
-| Admin Dashboard | `admin-dashboard` | Primary |
-| Analytics & Reporting | `analytics` | Primary |
-| Provider Management | `provider-management` | Primary |
-| User & Role Management | `user-management` | Primary |
-| Billing Operations | `billing-operations` | Secondary |
-| PHI Access Audit Log | `audit-log` | Secondary |
-| Clinic Settings | `clinic-settings` | Secondary |
-| Provider Availability Management | `provider-availability` | Secondary *(shared with `scheduler`)* |
+| Page | Roles |
+|------|-------|
+| Patient Chart | `provider`, `clinic-admin` |
 
 ---
 
 ## 4. User Journeys
 
-### Patient First-Time Registration
+### Patient Onboarding
+New patients register, verify their identity, and configure their account before reaching their dashboard.
 
-New patient creates an account, verifies their email, completes health onboarding, and lands in the provider directory.
-
-1. **Patient Sign-Up** (`signup`) — submit registration form
-2. **Email Verification** (`verify-email`) — click confirmation link
-3. **Patient Onboarding** (`onboarding-patient`) — complete health history, insurance, and consents wizard
-4. **Provider Discovery** (`provider-search`) — browse and filter available providers
+```
+Home (/)
+  → Patient Sign-Up (/signup)
+  → Email Verification (/verify-email)
+  → Insurance Information (/patient/insurance)
+  → Patient Profile & Settings (/patient/settings)
+  → Patient Dashboard (/patient/dashboard)
+```
 
 ---
 
-### Patient Books an Appointment
+### Patient Books a Visit
+A patient discovers a provider and books an appointment.
 
-Authenticated patient selects a provider and schedules a visit.
-
-1. **Provider Discovery** (`provider-search`) — search by specialty, availability, or location
-2. **Provider Public Profile** (`provider-profile`) — review bio and trigger booking
-3. **Book Appointment** (`appointment-book`) — choose time slot, specify reason, confirm
-4. **Patient Appointments** (`appointments-patient`) — confirm appointment appears in list
-5. **Appointment Detail (Patient)** (`appointment-detail-patient`) — review pre-visit instructions
+```
+Patient Dashboard (/patient/dashboard)
+  → Find a Provider (/patient/providers)
+  → Provider Public Profile (/providers/:id)
+  → Book Appointment (/patient/book)
+  → My Appointments (/patient/appointments)
+```
 
 ---
 
 ### Patient Attends a Video Visit
+A patient enters the visit workflow from their appointment list.
 
-Patient joins and completes a virtual care encounter.
-
-1. **Appointment Detail (Patient)** (`appointment-detail-patient`) — review instructions and join
-2. **Virtual Waiting Room** (`waiting-room`) — device check and queue status
-3. **Video Visit (Patient)** (`video-visit-patient`) — live consultation with provider
-4. **After-Visit Summary (Patient)** (`visit-summary-patient`) — review diagnosis notes, prescriptions, and follow-up actions
-
----
-
-### Patient Pays a Balance
-
-Patient reviews charges from a completed visit and submits payment.
-
-1. **After-Visit Summary (Patient)** (`visit-summary-patient`) — see charges generated
-2. **Billing & Invoices (Patient)** (`billing-patient`) — review outstanding balance and EOBs
-3. **Make a Payment** (`payment`) — submit payment by card or HSA/FSA
+```
+My Appointments (/patient/appointments)
+  → Appointment Detail (/patient/appointments/:id)
+  → Patient Waiting Room (/patient/appointments/:id/waiting-room)
+  → Video Visit (/patient/appointments/:id/visit)
+```
 
 ---
 
-### Provider First-Time Onboarding
+### Patient Reviews Visit & Pays
+After a visit, the patient reviews clinical output and settles their balance.
 
-New clinician registers, verifies their account, and completes their professional profile.
-
-1. **Provider Registration** (`provider-signup`) — submit credentials, NPI, and specialties
-2. **Email Verification** (`verify-email`) — click confirmation link
-3. **Provider Onboarding** (`onboarding-provider`) — upload credentials, set availability, configure billing
-4. **Provider Dashboard** (`provider-dashboard`) — arrive at home screen with today's schedule
-
----
-
-### Provider Conducts a Video Visit
-
-Provider prepares for, conducts, documents, and closes out a video encounter.
-
-1. **Provider Schedule** (`provider-schedule`) — locate appointment and launch prep
-2. **Appointment Detail (Provider)** (`appointment-detail-provider`) — review patient intake and prior notes
-3. **Video Visit (Provider)** (`video-visit-provider`) — live consultation with embedded chart sidebar
-4. **Clinical Notes Editor** (`clinical-notes`) — author SOAP/DAP note with voice-to-text
-5. **E-Prescribing** (`eprescribing`) — issue prescriptions with drug-interaction check
-6. **Visit Sign-Off (Provider)** (`visit-summary-provider`) — attest note, finalize diagnosis codes, submit charges
+```
+Appointment Detail (/patient/appointments/:id)
+  → Health Records (/patient/records)
+  → My Prescriptions (/patient/prescriptions)
+  → Billing & Invoices (/patient/billing)
+  → Make a Payment (/patient/billing/pay)
+```
 
 ---
 
-### Provider Reviews Patient Chart Between Visits
+### Patient Sends a Secure Message
+A patient initiates a HIPAA-compliant message to their care team.
 
-Provider looks up a patient outside of a scheduled appointment to review history or update notes.
-
-1. **Provider Dashboard** (`provider-dashboard`) — start from home screen
-2. **Patient Lookup** (`patient-lookup`) — search by name or MRN
-3. **Patient Chart (EHR)** (`patient-chart`) — review longitudinal record
-4. **Clinical Notes Editor** (`clinical-notes`) — add or amend a note
-
----
-
-### Scheduler Creates an Appointment
-
-Front-desk staff books a visit on behalf of a patient.
-
-1. **Scheduler Dashboard** (`scheduler-dashboard`) — start from front-desk home screen
-2. **Patient Lookup** (`patient-lookup`) — locate existing patient record
-3. **New Appointment (Scheduler)** (`new-appointment`) — select provider, time, and visit type
-4. **Schedule Management** (`schedule-management`) — confirm appointment appears on multi-provider calendar
+```
+Patient Dashboard (/patient/dashboard)
+  → Messages (/patient/messages)
+  → Message Thread (/patient/messages/:threadId)
+```
 
 ---
 
-### Front-Desk Patient Check-In
+### Provider Conducts a Full Visit
+A provider moves from their queue through the complete clinical visit workflow.
 
-Scheduler confirms a patient's arrival and validates their insurance before the visit.
+```
+Provider Dashboard (/provider/dashboard)
+  → Today's Appointment Queue (/provider/queue)
+  → Appointment Detail (/provider/appointments/:id)
+  → Patient Chart (/provider/patients/:patientId/chart)
+  → Provider Waiting Room (/provider/appointments/:id/waiting-room)
+  → Video Visit (/provider/appointments/:id/visit)
+  → Clinical Notes (/provider/appointments/:id/notes)
+  → E-Prescribing (/provider/appointments/:id/prescribe)
+```
 
-1. **Schedule Management** (`schedule-management`) — identify arriving patient on today's schedule
-2. **Patient Check-In** (`patient-checkin`) — confirm arrival, verify identity, update demographics
-3. **Insurance Eligibility Verification** (`insurance-verification`) — run real-time eligibility check and review coverage
+---
+
+### Provider Manages Availability
+A provider updates their recurring schedule from the dashboard.
+
+```
+Provider Dashboard (/provider/dashboard)
+  → Availability Settings (/provider/availability)
+```
+
+---
+
+### Front Desk Schedules a Patient
+A scheduler looks up a patient and books a visit on their behalf.
+
+```
+Scheduler Dashboard (/scheduler/dashboard)
+  → Patient Search (/scheduler/patients)
+  → Patient Profile — Front Desk (/scheduler/patients/:id)
+  → Schedule Appointment (/scheduler/appointments/new)
+  → Appointment Management (/scheduler/appointments)
+```
+
+---
+
+### Front Desk Checks In a Patient
+A scheduler confirms a patient's arrival and notifies the provider.
+
+```
+Scheduler Dashboard (/scheduler/dashboard)
+  → Patient Search (/scheduler/patients)
+  → Patient Check-In (/scheduler/appointments/:id/check-in)
+```
 
 ---
 
 ### Admin Reviews Clinic Performance
+An admin surveys operational KPIs and detailed reports.
 
-Admin monitors KPIs, drills into detailed reports, and audits PHI access activity.
+```
+Admin Dashboard (/admin/dashboard)
+  → Utilization Report (/admin/reports/utilization)
+  → Revenue Report (/admin/reports/revenue)
+  → No-Show Report (/admin/reports/no-shows)
+```
 
-1. **Admin Dashboard** (`admin-dashboard`) — review real-time KPI tiles (utilization, no-shows, revenue)
-2. **Analytics & Reporting** (`analytics`) — drill down by date range, provider, or payer
-3. **PHI Access Audit Log** (`audit-log`) — review access events for HIPAA compliance
+---
+
+### Admin Onboards a New Provider
+An admin creates a user account and sets up the provider's clinical profile.
+
+```
+User Management (/admin/users)
+  → Provider Management (/admin/providers)
+```
+
+---
+
+### Admin Conducts HIPAA Compliance Review
+An admin audits PHI access events from the dashboard.
+
+```
+Admin Dashboard (/admin/dashboard)
+  → HIPAA Audit Log (/admin/audit-log)
+```
+
+---
+
+### Admin Configures Role Permissions
+An admin adjusts role-based access control for platform users.
+
+```
+User Management (/admin/users)
+  → Role & Permissions (/admin/roles)
+```
+```
