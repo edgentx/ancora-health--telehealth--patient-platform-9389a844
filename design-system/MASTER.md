@@ -1,17 +1,17 @@
 ## Design System: Ancora Health — Telehealth & Patient Platform
 
 ### Pattern
-- **Name:** Video-First Hero
-- **Conversion Focus:** 86% higher engagement with video. Add captions for accessibility. Compress video for performance.
-- **CTA Placement:** Overlay on video (center/bottom) + Bottom section
-- **Color Strategy:** Dark overlay 60% on video. Brand accent for CTA. White text on dark.
-- **Sections:** 1. Hero with video background, 2. Key features overlay, 3. Benefits section, 4. CTA
+- **Name:** Real-Time / Operations Landing
+- **Conversion Focus:** For ops/security/iot products. Demo or sandbox link. Trust signals.
+- **CTA Placement:** Primary CTA in nav + After metrics
+- **Color Strategy:** Dark or neutral. Status colors (green/amber/red). Data-dense but scannable.
+- **Sections:** 1. Hero (product + live preview or status), 2. Key metrics/indicators, 3. How it works, 4. CTA (Start trial / Contact)
 
 ### Style
-- **Name:** Minimalism & Swiss Style
-- **Keywords:** Clean, simple, spacious, functional, white space, high contrast, geometric, sans-serif, grid-based, essential
-- **Best For:** Enterprise apps, dashboards, documentation sites, SaaS platforms, professional tools
-- **Performance:** ⚡ Excellent | **Accessibility:** ✓ WCAG AAA
+- **Name:** Sketch Hand-Drawn (Mobile)
+- **Keywords:** sketch, hand-drawn, handwriting, wobbly, imperfect, paper, kalam, organic, collage, post-it, tape, offset shadow, scribble
+- **Best For:** Low-fidelity prototyping, creative brands, children/picturebook apps, education tools, journaling apps, gamified puzzles
+- **Performance:** ✓ Lightweight | **Accessibility:** ⚠ Moderate (small/muted text risk)
 
 ### Colors
 | Role | Hex |
@@ -22,7 +22,7 @@
 | Background | #F8FAFC |
 | Text | #1E293B |
 
-*Notes: Video pink on dark + timeline blue*
+*Notes: Event orange + map blue*
 
 ### Typography
 - **Heading:** Plus Jakarta Sans
@@ -36,10 +36,11 @@
 ```
 
 ### Key Effects
-Subtle hover (200-250ms), smooth transitions, sharp shadows if any, clear type hierarchy, fast loading
+Wobbly borderRadius (unique per corner: 15/25/20/10), borderWidth 2–3 solid/dashed, hard offset shadow via rear View (4px,4px) #2D2D2D, Kalam Bold headings, PatrickHand Regular body, slight rotation (-1deg/1deg) on cards, absolute SVG scribble overlays (arrows/tape/tacks), jiggle -2deg↔2deg on error, LayoutAnimation spring on layout changes, Haptics on press, paper texture repeating background
 
 ### Avoid (Anti-patterns)
-- Excessive decoration
+- Complex shadows
+- 3D effects
 
 ### Pre-Delivery Checklist
 - [ ] No emojis as icons (use SVG: Heroicons/Lucide)
