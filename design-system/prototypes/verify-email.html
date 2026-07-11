@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email — Ancora Health — Telehealth & Patient Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #2563EB;
+      --secondary: #3B82F6;
+      --cta: #F97316;
+      --bg: #F8FAFC;
+      --text: #1E293B;
+      --muted: #64748B;
+      --border: #E2E8F0;
+      --white: #FFFFFF;
+      --radius-xl: 16px;
+      --radius-lg: 12px;
+      --radius-md: 8px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 24px rgba(0,0,0,0.09), 0 4px 8px rgba(0,0,0,0.04);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-top {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      gap: 12px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+
+    .logo-mark {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-text-wrap { line-height: 1.2; }
+
+    .logo-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .nav-primary {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex: 1;
+      min-width: 0;
+    }
+    .nav-primary::-webkit-scrollbar { display: none; }
+
+    .nav-item {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: var(--radius-md);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: none;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-item:hover { background: #F1F5F9; color: var(--text); }
+    .nav-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    .nav-utility {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius-md);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+      border: none;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: #F1F5F9; }
+    .btn-cta { background: var(--cta); color: #fff; }
+    .btn-cta:hover { background: #EA6D00; }
+    .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    /* Secondary nav */
+    .nav-secondary {
+      border-top: 1px solid var(--border);
+      background: #FAFBFD;
+    }
+
+    .nav-secondary-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      height: 36px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      gap: 2px;
+    }
+    .nav-secondary-inner::-webkit-scrollbar { display: none; }
+
+    .nav-sm {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 7px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-sm:hover { background: #EFF6FF; color: var(--primary); }
+    .nav-sm:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+    .nav-divider {
+      width: 1px;
+      height: 14px;
+      background: var(--border);
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* ── Main ── */
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 52px 20px 80px;
+    }
+
+    .page-intro {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .page-intro h1 {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .page-intro p {
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    /* ── Bento Grid ── */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: auto auto auto;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 28px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover { transform: scale(1.01); box-shadow: var(--shadow-md); }
+
+    .card-main  { grid-column: span 2; }
+    .card-sec   { grid-column: span 1; }
+    .card-wide  { grid-column: span 3; }
+    .card-half  { grid-column: span 1; }
+
+    /* ── Verify Form Card ── */
+    .card-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+      gap: 12px;
+    }
+
+    .email-icon-wrap {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #FFF7ED;
+      color: #C2410C;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #F97316;
+    }
+
+    .verify-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+      letter-spacing: -0.2px;
+    }
+
+    .verify-body {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 6px;
+    }
+
+    .email-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      padding: 3px 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .divider { height: 1px; background: var(--border); margin: 22px 0; }
+
+    .info-box {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 13px 16px;
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: var(--radius-lg);
+      margin-bottom: 22px;
+    }
+
+    .info-box-text {
+      font-size: 12.5px;
+      color: #1E40AF;
+      line-height: 1.55;
+    }
+    .info-box-text strong { font-weight: 700; }
+
+    .otp-label {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+      display: block;
+      margin-bottom: 11px;
+    }
+
+    .otp-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .otp-box {
+      width: 50px;
+      height: 58px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      font-family: 'Inter', monospace;
+      color: var(--text);
+      background: var(--white);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      cursor: text;
+    }
+    .otp-box:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .otp-box.filled {
+      border-color: var(--primary);
+      background: #EFF6FF;
+      color: var(--primary);
+    }
+
+    .btn-verify {
+      width: 100%;
+      padding: 13px;
+      font-size: 14.5px;
+      font-weight: 700;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-verify:hover {
+      background: #1D4ED8;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(37,99,235,0.28);
+    }
+    .btn-verify:active { transform: translateY(0); }
+    .btn-verify:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
+    .resend-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .resend-label { font-size: 12.5px; color: var(--muted); }
+
+    .resend-btn {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .resend-btn:hover { color: #1D4ED8; text-decoration: underline; }
+    .resend-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    .timer-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      background: #F1F5F9;
+      padding: 3px 9px;
+      border-radius: 20px;
+    }
+
+    /* ── Side cards ── */
+    .card-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .icon-green  { background: #DCFCE7; }
+    .icon-orange { background: #FFF7ED; }
+    .icon-blue   { background: #EFF6FF; }
+    .icon-indigo { background: #EEF2FF; }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+      letter-spacing: -0.1px;
+    }
+
+    .card-body {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .hipaa-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 14px;
+      padding: 8px 12px;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: var(--radius-md);
+    }
+
+    .hipaa-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #166534;
+    }
+
+    /* Steps */
+    .steps { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+    .step { display: flex; align-items: flex-start; gap: 10px; }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-num-done  { background: #22C55E; }
+    .step-num-now   { background: var(--primary); }
+    .step-num-later { background: #CBD5E1; }
+
+    .step-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1px;
+    }
+    .step-name-later { color: var(--muted); }
+
+    .step-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+    /* Wide help card */
+    .help-card-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .help-left { display: flex; align-items: center; gap: 14px; }
+
+    .help-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .help-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+      padding: 7px 13px;
+      border: 1px solid #BFDBFE;
+      border-radius: var(--radius-md);
+      background: #EFF6FF;
+      transition: all 0.15s;
+    }
+    .help-link:hover { background: #DBEAFE; border-color: var(--primary); }
+    .help-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    /* Wrong email card */
+    .wrong-email-card { background: #FFFBEB; border-color: #FDE68A; }
+    .wrong-email-card:hover { box-shadow: 0 4px 12px rgba(251,191,36,0.15); }
+
+    .change-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #92400E;
+      text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid #FCD34D;
+      border-radius: var(--radius-md);
+      background: #FEF9C3;
+      margin-top: 12px;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .change-link:hover { background: #FEF08A; }
+    .change-link:focus-visible { outline: 2px solid #92400E; outline-offset: 2px; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 20px;
+    }
+
+    .footer-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .footer-copy { font-size: 11.5px; color: var(--muted); }
+
+    .footer-links { display: flex; gap: 16px; align-items: center; }
+
+    .footer-link {
+      font-size: 11.5px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-link:hover { color: var(--primary); }
+    .footer-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .bento { grid-template-columns: repeat(2, 1fr); }
+      .card-main  { grid-column: span 2; }
+      .card-sec   { grid-column: span 1; }
+      .card-wide  { grid-column: span 2; }
+      .card-half  { grid-column: span 1; }
+    }
+
+    @media (max-width: 768px) {
+      .nav-primary { display: none; }
+      main { padding: 32px 16px 60px; }
+      .bento { grid-template-columns: 1fr; gap: 12px; }
+      .card-main, .card-sec, .card-wide, .card-half { grid-column: span 1; }
+      .page-intro h1 { font-size: 24px; }
+      .otp-box { width: 44px; height: 52px; font-size: 20px; }
+    }
+
+    @media (max-width: 375px) {
+      .otp-box { width: 40px; height: 48px; font-size: 18px; }
+      .otp-row { gap: 6px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Site Header ── -->
+  <header class="site-header" role="banner">
+    <div class="nav-top">
+      <!-- Logo -->
+      <a href="#" class="logo" aria-label="Ancora Health home">
+        <div class="logo-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M9 1.5C9 1.5 2 5 2 10.5a7 7 0 0014 0C16 5 9 1.5 9 1.5z" fill="white" opacity="0.85"/>
+            <path d="M9 6v6M6 9h6" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="logo-text-wrap">
+          <div class="logo-name">Ancora Health</div>
+          <div class="logo-sub">Telehealth &amp; Patient Platform</div>
+        </div>
+      </a>
+
+      <!-- Primary Nav -->
+      <nav class="nav-primary" aria-label="Primary navigation">
+        <a href="#" class="nav-item">Home</a>
+        <a href="#" class="nav-item">Provider Directory</a>
+        <a href="#" class="nav-item">Patient Dashboard</a>
+        <a href="#" class="nav-item">Appointments</a>
+        <a href="#" class="nav-item">Provider Dashboard</a>
+        <a href="#" class="nav-item">Provider Schedule</a>
+        <a href="#" class="nav-item">Scheduler Dashboard</a>
+        <a href="#" class="nav-item">Calendar</a>
+        <a href="#" class="nav-item">Check-In</a>
+        <a href="#" class="nav-item">Admin Console</a>
+        <a href="#" class="nav-item">Messages</a>
+      </nav>
+
+      <!-- Utility -->
+      <div class="nav-utility">
+        <a href="#" class="btn btn-outline">Log In</a>
+        <a href="#" class="btn btn-cta">Sign Up</a>
+      </div>
+    </div>
+
+    <!-- Secondary Nav -->
+    <nav class="nav-secondary" aria-label="Secondary navigation">
+      <div class="nav-secondary-inner">
+        <a href="#" class="nav-sm">Health Records</a>
+        <a href="#" class="nav-sm">Billing</a>
+        <a href="#" class="nav-sm">Prescriptions</a>
+        <div class="nav-divider" role="separator"></div>
+        <a href="#" class="nav-sm">Patient Chart</a>
+        <a href="#" class="nav-sm">e-Prescribe</a>
+        <a href="#" class="nav-sm">Claims</a>
+        <div class="nav-divider" role="separator"></div>
+        <a href="#" class="nav-sm">Book Appointment</a>
+        <a href="#" class="nav-sm">Patient Lookup</a>
+        <div class="nav-divider" role="separator"></div>
+        <a href="#" class="nav-sm">Utilization</a>
+        <a href="#" class="nav-sm">Revenue</a>
+        <a href="#" class="nav-sm">Audit Log</a>
+        <a href="#" class="nav-sm">Providers</a>
+        <a href="#" class="nav-sm">Staff</a>
+        <div class="nav-divider" role="separator"></div>
+        <a href="#" class="nav-sm">Account Settings</a>
+        <a href="#" class="nav-sm">Clinic Settings</a>
+        <a href="#" class="nav-sm">Privacy Policy</a>
+        <a href="#" class="nav-sm">Terms of Service</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ── Main ── -->
+  <main id="main-content">
+    <div class="page-intro">
+      <h1>Verify Your Email Address</h1>
+      <p>Complete your account setup to access Ancora Health telehealth services</p>
+    </div>
+
+    <div class="bento" role="main">
+
+      <!-- ── Verification Form Card (spans 2 cols) ── -->
+      <section class="card card-main" aria-labelledby="verify-heading">
+        <div class="card-top-row">
+          <div class="email-icon-wrap" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <rect x="2" y="7" width="28" height="20" rx="4" fill="#DBEAFE" stroke="#2563EB" stroke-width="1.4"/>
+              <path d="M2 11l14 10L30 11" stroke="#2563EB" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="29" cy="28" r="7" fill="#22C55E" stroke="#fff" stroke-width="2"/>
+              <path d="M25.5 28l2.5 2.5L33 25" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="status-pill" role="status" aria-live="polite">
+            <div class="status-dot"></div>
+            Awaiting Verification
+          </div>
+        </div>
+
+        <h2 class="verify-title" id="verify-heading">Check your inbox</h2>
+        <p class="verify-body">We sent a 6-digit verification code to:</p>
+        <div class="email-chip" aria-label="Email address: j.smith@example.com">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <rect x="1" y="2.5" width="11" height="8" rx="1.5" stroke="#2563EB" stroke-width="1.2"/>
+            <path d="M1 4.5l5.5 3.5 5.5-3.5" stroke="#2563EB" stroke-width="1.2"/>
+          </svg>
+          j.smith@example.com
+        </div>
+        <p class="verify-body">Enter the code below to confirm your identity. For your security, this code expires in <strong style="color:var(--text);">10 minutes</strong>.</p>
+
+        <div class="divider" role="separator"></div>
+
+        <div class="info-box" role="note">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px;">
+            <circle cx="9" cy="9" r="8" stroke="#3B82F6" stroke-width="1.3"/>
+            <path d="M9 8v5M9 6v.5" stroke="#3B82F6" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <p class="info-box-text">
+            <strong>Didn't receive the email?</strong> Check your spam or junk folder. Email will arrive from <strong>noreply@ancorahealth.com</strong> within 1–2 minutes.
+          </p>
+        </div>
+
+        <label class="otp-label" for="otp1">Enter your 6-digit verification code</label>
+        <div class="otp-row" role="group" aria-label="6-digit verification code input">
+          <input class="otp-box filled" type="text" id="otp1" inputmode="numeric" pattern="[0-9]" maxlength="1" value="4" aria-label="Digit 1 of 6" autocomplete="off">
+          <input class="otp-box filled" type="text" id="otp2" inputmode="numeric" pattern="[0-9]" maxlength="1" value="8" aria-label="Digit 2 of 6" autocomplete="off">
+          <input class="otp-box filled" type="text" id="otp3" inputmode="numeric" pattern="[0-9]" maxlength="1" value="2" aria-label="Digit 3 of 6" autocomplete="off">
+          <input class="otp-box" type="text" id="otp4" inputmode="numeric" pattern="[0-9]" maxlength="1" value="" aria-label="Digit 4 of 6" autocomplete="off">
+          <input class="otp-box" type="text" id="otp5" inputmode="numeric" pattern="[0-9]" maxlength="1" value="" aria-label="Digit 5 of 6" autocomplete="off">
+          <input class="otp-box" type="text" id="otp6" inputmode="numeric" pattern="[0-9]" maxlength="1" value="" aria-label="Digit 6 of 6" autocomplete="off">
+        </div>
+
+        <button class="btn-verify" type="button" aria-label="Verify email address">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+            <path d="M3.5 8.5l3.5 3.5 6.5-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Verify Email Address
+        </button>
+
+        <div class="resend-row">
+          <span class="resend-label">Didn't get the code?</span>
+          <button class="resend-btn" type="button" aria-label="Resend verification code">Resend code</button>
+          <span class="timer-chip" aria-live="polite" aria-label="7 minutes and 23 seconds remaining">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+              <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" stroke-width="1.1"/>
+              <path d="M5.5 3v3l1.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+            </svg>
+            7:23 remaining
+          </span>
+        </div>
+      </section>
+
+      <!-- ── HIPAA Security Card ── -->
+      <section class="card card-sec" aria-labelledby="security-heading">
+        <div class="card-icon icon-green" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M11 2L3.5 5.5v5.5c0 4.5 3 8 7.5 9 4.5-1 7.5-4.5 7.5-9V5.5L11 2z" stroke="#16A34A" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+            <path d="M7.5 11l2.5 2.5 4.5-4.5" stroke="#16A34A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3 class="card-title" id="security-heading">HIPAA-Secure Verification</h3>
+        <p class="card-body">
+          Your email verification is processed through our HIPAA-compliant identity pipeline. Verification tokens are encrypted, single-use, and hash-validated. No PHI is transmitted in the verification email.
+        </p>
+        <div class="hipaa-row">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="7" cy="7" r="6" stroke="#16A34A" stroke-width="1.2"/>
+            <path d="M4.5 7l2 2 3-3" stroke="#16A34A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="hipaa-label">HIPAA-Aligned · AES-256 Encrypted</span>
+        </div>
+      </section>
+
+      <!-- ── Registration Steps Card ── -->
+      <section class="card card-sec" aria-labelledby="steps-heading">
+        <div class="card-icon icon-blue" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M3 6h16M3 11h10M3 16h7" stroke="#2563EB" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3 class="card-title" id="steps-heading">Your setup progress</h3>
+        <ul class="steps" aria-label="Account setup steps">
+          <li class="step">
+            <div class="step-num step-num-done" aria-label="Completed">
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                <path d="M2 5.5l2.5 2.5 4.5-4.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="step-name">Account Created</div>
+              <div class="step-hint">Your Ancora Health account is registered</div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-num step-num-now" aria-label="Current step">2</div>
+            <div>
+              <div class="step-name">Verify Email</div>
+              <div class="step-hint">Confirm your address with the code above</div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-num step-num-later" aria-label="Upcoming">3</div>
+            <div>
+              <div class="step-name step-name-later">Complete Intake Profile</div>
+              <div class="step-hint">Add health history, insurance &amp; demographics</div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-num step-num-later" aria-label="Upcoming">4</div>
+            <div>
+              <div class="step-name step-name-later">Book Your First Visit</div>
+              <div class="step-hint">Search providers and schedule virtual care</div>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ── Wrong Email Card ── -->
+      <section class="card card-half wrong-email-card" aria-labelledby="wrong-email-heading">
+        <div class="card-icon icon-orange" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="2" y="5" width="18" height="13" rx="2.5" stroke="#EA580C" stroke-width="1.5"/>
+            <path d="M2 8l9 6 9-6" stroke="#EA580C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 3l2 2M15 3l-2 2" stroke="#EA580C" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3 class="card-title" id="wrong-email-heading">Wrong email address?</h3>
+        <p class="card-body">If you registered with an incorrect email address, you can update it before completing verification. You'll receive a new code at your corrected address.</p>
+        <a href="#" class="change-link" role="button">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <path d="M9 1.5l2.5 2.5L4 11.5H1.5V9L9 1.5z" stroke="#92400E" stroke-width="1.2" stroke-linejoin="round"/>
+          </svg>
+          Change email address
+        </a>
+      </section>
+
+      <!-- ── MFA Notice Card ── -->
+      <section class="card card-half" style="background:linear-gradient(135deg,#EFF6FF,#F8FAFC);" aria-labelledby="mfa-heading">
+        <div class="card-icon icon-indigo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="4" y="10" width="14" height="9" rx="2" stroke="#4F46E5" stroke-width="1.5"/>
+            <path d="M7 10V7a4 4 0 018 0v3" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="11" cy="14.5" r="1.5" fill="#4F46E5"/>
+          </svg>
+        </div>
+        <h3 class="card-title" id="mfa-heading">Two-Factor Authentication</h3>
+        <p class="card-body">After verifying your email, you'll be prompted to set up multi-factor authentication (MFA). MFA is required for all Ancora Health accounts to protect access to sensitive health information.</p>
+        <div style="margin-top:12px; display:flex; align-items:center; gap:6px;">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <circle cx="6.5" cy="6.5" r="5.5" stroke="#4F46E5" stroke-width="1.1"/>
+            <path d="M6.5 3.5v3.5l2 1" stroke="#4F46E5" stroke-width="1.1" stroke-linecap="round"/>
+          </svg>
+          <span style="font-size:11.5px; color:#3730A3; font-weight:600;">Takes about 2 minutes to set up</span>
+        </div>
+      </section>
+
+      <!-- ── Full-width Help Card ── -->
+      <section class="card card-wide" style="padding:20px 28px;" aria-labelledby="help-heading">
+        <div class="help-card-inner">
+          <div class="help-left">
+            <div class="card-icon icon-orange" style="margin-bottom:0; flex-shrink:0;" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <circle cx="11" cy="11" r="9" stroke="#EA580C" stroke-width="1.5"/>
+                <path d="M8 8.5C8 7.1 9.1 6 11 6c1.7 0 3 1.1 3 2.5 0 1.2-.9 2.2-2.2 2.4L11 12" stroke="#EA580C" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="11" cy="15" r="0.8" fill="#EA580C"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title" id="help-heading" style="margin-bottom:3px;">Need help verifying your account?</h3>
+              <p class="card-body">Our patient support team is available Monday – Friday, 8 AM – 8 PM ET and Saturday, 9 AM – 5 PM ET.</p>
+            </div>
+          </div>
+          <nav class="help-actions" aria-label="Support options">
+            <a href="#" class="help-link">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M1.5 1.5h10v7.5H7.5L4 11V9H1.5V1.5z" stroke="#2563EB" stroke-width="1.2" stroke-linejoin="round"/>
+              </svg>
+              Live Chat
+            </a>
+            <a href="#" class="help-link">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <rect x="1" y="2.5" width="11" height="8" rx="1.5" stroke="#2563EB" stroke-width="1.2"/>
+                <path d="M1 4.5l5.5 3.5 5.5-3.5" stroke="#2563EB" stroke-width="1.2"/>
+              </svg>
+              Email Support
+            </a>
+            <a href="#" class="help-link">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M2 2.5c.5-.5 1.5-.5 2 0l1.5 2c.3.4.2.9-.2 1.3L4.5 6.6c.6 1.1 1.5 2.1 2.6 2.6l.8-.8c.4-.4.9-.5 1.4-.2l2 1.5c.5.5.5 1.5 0 2-.5.5-8.5 2.5-10-8z" stroke="#2563EB" stroke-width="1.2" stroke-linejoin="round"/>
+              </svg>
+              1-800-ANCORA-H
+            </a>
+            <a href="#" class="help-link">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <circle cx="6.5" cy="6.5" r="5.5" stroke="#2563EB" stroke-width="1.2"/>
+                <path d="M6.5 3.5v3l1.5 1.5" stroke="#2563EB" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+              Help Center
+            </a>
+          </nav>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="footer-inner">
+      <p class="footer-copy">© 2026 Ancora Health — Telehealth &amp; Patient Platform. All rights reserved.</p>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="#" class="footer-link">Privacy Policy</a>
+        <a href="#" class="footer-link">Terms of Service</a>
+        <a href="#" class="footer-link">HIPAA Notice of Privacy Practices</a>
+        <a href="#" class="footer-link">Accessibility</a>
+      </nav>
+    </div>
+  </footer>
+
+</body>
+</html>
